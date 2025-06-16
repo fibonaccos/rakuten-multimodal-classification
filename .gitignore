@@ -164,3 +164,7 @@ cython_debug/
 
 # Data folder
 data/
+
+# Python scripts
+/gitbegin.py
+/gitfinish.py
