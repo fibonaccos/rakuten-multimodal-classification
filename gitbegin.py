@@ -35,9 +35,9 @@ def main():
     repo_name = REPO_URL.rstrip('/').split('/')[-1].replace(".git", "")
     os.chdir(repo_name)
 
-    print("Updating branch `main` ...")
-    run_cmd("git checkout main")
-    run_cmd("git pull origin main")
+    print("Updating branch `dev` ...")
+    run_cmd("git checkout dev")
+    run_cmd("git pull origin dev")
 
     print(f"Creating branch `{full_branch_name}` ...")
     run_cmd(f"git checkout -b {full_branch_name}")
