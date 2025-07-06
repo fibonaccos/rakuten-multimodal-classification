@@ -36,7 +36,7 @@ def main():
     run_cmd(f"git push origin {branch}")
 
     print(f"Changes on branch `{branch}` successfully committed.")
-    print(f"You can now create a pull request on {REPO_URL} to merge your changes on branch `main`.")
+    print(f"You can now create a pull request on {REPO_URL} to merge your changes on branch `dev`.")
 
 
 if __name__ == "__main__":
