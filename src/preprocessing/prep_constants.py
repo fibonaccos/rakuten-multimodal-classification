@@ -13,16 +13,16 @@ PROCESSED_DATASET_TEXT_PATH: dict[str, Path]
 PROCESSED_DATASET_IMG_PATH: dict[str, Path]
 
 
-ORIGINAL_DATASET_TEXT_PATH = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/data/X_train.csv"),
-                              "xtest": Path("/home/wsladmin/fibonaccos/projects/data/X_test.csv"),
-                              "ytrain": Path("/home/wsladmin/fibonaccos/projects/data/Y_train.csv")}
+ORIGINAL_DATASET_TEXT_PATH = {"xtrain": Path("/path/to/X_train.csv"),
+                              "xtest": Path("/path/to/X_test.csv"),
+                              "ytrain": Path("/path/to/Y_train.csv")}
 
-ORIGINAL_DATASET_IMG_PATH = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/data/images/image_train/"),
-                             "xtest": Path("/home/wsladmin/fibonaccos/projects/data/images/image_test/")}
+ORIGINAL_DATASET_IMG_PATH = {"xtrain": Path("/path/to/image_train/"),
+                             "xtest": Path("/path/to/image_test/")}
 
-PROCESSED_DATASET_TEXT_PATH = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/.data/text/X_train.csv"),
-                               "xtest": Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/.data/text/X_test.csv"),
-                               "ytrain": Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/.data/text/Y_train.csv")}
+PROCESSED_DATASET_TEXT_PATH = {"xtrain": Path("/path/to/preprocessed/X_train.csv"),
+                               "xtest": Path("/path/to/preprocessed/X_test.csv"),
+                               "ytrain": Path("/path/to/preprocessed/Y_train.csv")}
 
-PROCESSED_DATASET_IMG_PATH = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/.data/images/train/"),
-                              "xtest": Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/.data/images/test/")}
+PROCESSED_DATASET_IMG_PATH = {"xtrain": Path("/path/to/preprocessed/images/train/"),
+                              "xtest": Path("/path/to/preprocessed/images/test/")}
