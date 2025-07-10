@@ -9,7 +9,7 @@ __all__ = ["DATASET_IMG_PATH",
            "image_reduce_shape"]
 
 
-DATASET_IMG_PATH: dict[str, Path] = {"train": Path(), "test": Path()}
+DATASET_IMG_PATH: dict[str, Path] = {"xtrain": Path(), "xtest": Path()}
 
 
 def image_to_gray(img: np.ndarray, weights: np.ndarray | None = None, channel_last: bool = True) -> np.ndarray:
