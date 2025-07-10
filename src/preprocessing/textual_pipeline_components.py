@@ -81,10 +81,10 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for col in TEXTUAL_COLUMNS:
-            X_transformed[col].apply(lambda text: self._clean_html(text), inplace=True)
-            X_transformed[col].apply(lambda text: self._clean_xml(text), inplace=True)
-            X_transformed[col].apply(lambda text: self._keep_accepted_characters(text), inplace=True)
-            X_transformed[col].apply(lambda text: self._clean_text_format(text), inplace=True)
+            X_transformed[col].apply(self._clean_html, inplace=True)
+            X_transformed[col].apply(self._clean_xml, inplace=True)
+            X_transformed[col].apply(self._keep_accepted_characters, inplace=True)
+            X_transformed[col].apply(self._clean_text_format, inplace=True)
         return X_transformed
 
     def _clean_html(self, text: Any) -> Any:
@@ -201,7 +201,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Build embeddings of the textual columns of `X`. Ignore 
+        Build embeddings of the textual columns of `X`. 
 
         Args:
             X (pd.DataFrame): The dataset to transform.
@@ -211,7 +211,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for col in TEXTUAL_COLUMNS:
-            X_transformed[col].apply(lambda text: self._encoder(text), inplace=True)
+            X_transformed[col].apply(self._encoder, inplace=True)
         return X_transformed
 
     def _split_text(self, text: str) -> list[str]:
