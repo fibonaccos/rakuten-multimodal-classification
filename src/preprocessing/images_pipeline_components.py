@@ -14,7 +14,7 @@ DATASET_IMG_PATH: dict[str, Path] = {"xtrain": Path(), "xtest": Path()}
 
 def image_to_gray(img: np.ndarray, weights: np.ndarray | None = None, channel_last: bool = True) -> np.ndarray:
     """
-    Convert an image to a grayscale by applying a weighted mean along the channels.
+    Convert an image to grayscale by applying a weighted mean along the channels.
 
     Args:
         img (np.ndarray): The image as a channel-last numpy array.
@@ -42,4 +42,4 @@ def image_reduce_shape(img: np.ndarray, output_shape: tuple[int, int]) -> np.nda
     Returns:
         np.ndarray: The reduced image.
     """
-    return cv2.resize(img, output_shape, interpolation=cv2.INTER_LINEAR)
+    return np.array(cv2.resize(img, output_shape, interpolation=cv2.INTER_LINEAR))

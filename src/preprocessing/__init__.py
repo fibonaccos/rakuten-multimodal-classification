@@ -1,3 +1,3 @@
 """
-Preprocessing submodule. Implements the pipelines to prepare the datasets.
+Preprocessing submodule. Implements the pipelines to clean the datasets.
 """
