@@ -23,11 +23,11 @@ def image_to_gray(img: np.ndarray, weights: np.ndarray | None = None, channel_la
     Returns:
         np.ndarray: The grayscaled image.
     """
-    if weights is None:
-        weights = np.ones(shape=(img.shape[-1], )) / 3
     mean_axis = -1
     if not channel_last:
         mean_axis = 0
+    if weights is None:
+        weights = np.ones(shape=(img.shape[mean_axis], )) / 3
     return np.tensordot(img, weights, axes=([mean_axis], [0]))
 
 
