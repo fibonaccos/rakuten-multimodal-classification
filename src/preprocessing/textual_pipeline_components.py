@@ -91,10 +91,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         for i, col in enumerate(TEXTUAL_COLUMNS):
             print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : html cleaning", end='')
             X_transformed[col] = X_transformed[col].apply(self._clean_html)
+
             print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : keep characters", end='')
             X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
+
             print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : format cleaning", end='')
             X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
+
         print("\r[CharacterCleaner] - Done\t\t\t")
         return X_transformed
 
@@ -212,7 +215,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         for i, col in enumerate(TEXTUAL_COLUMNS):
             print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)} : embedding", end='')
             X_transformed[col] = X_transformed[col].apply(self._encoder)
-        print("\r[Vectorizer] - Done\t\t\t",)
+        print("\r[Vectorizer] - Done\t\t\t")
         return X_transformed
 
     def _split_text(self, /, text: str) -> list[str]:
@@ -251,7 +254,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             np.ndarray | Any: The result of embedding if `text` is not a missing value
         """
         if isinstance(text, str):
-            return np.mean(self.model_.encode(self._split_text(text)), axis=0)
+            return np.mean(self.model_.encode(self._split_text(text), convert_to_numpy=True), axis=0)
         return text
 
 
@@ -285,7 +288,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             y (Any, optional): The predictions dataset. Defaults to None.
 
         Returns:
-            `EmbeddingExpander`: The fitted transformer.
+            EmbeddingExpander: The fitted transformer.
         """
         return self
 
@@ -301,16 +304,35 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for i, col in enumerate(self.cols_to_expand_):
-            expand_size = len(next(v for v in X_transformed[col] if isinstance(v, np.ndarray)))
+            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : making array-like", end='')
+            X_transformed[col] = X_transformed[col].apply(self._make_array_like)
+
+            expand_size = len(X[~X[col].isna()].reset_index()[col][0])
+            col_names = [col + "_" + str(i + 1) for i in range(expand_size)]
+
             print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : computing vectors", end='')
-            vectors = np.stack([v if isinstance(v, np.ndarray) else np.zeros(expand_size) for v in X_transformed[col]])
-            col_names = [col + "_" + str(i) for i in range(expand_size)]
-            expand_df = pd.DataFrame(vectors, columns=col_names, index=X_transformed.index)
+
+            vectors = np.stack([v if isinstance(v, list) else np.zeros(expand_size) for v in X_transformed[col]])
+            print(vectors.shape)
+            expand_df = pd.DataFrame(vectors, columns=col_names, index=X.index)
+            print(expand_df.shape)
+
             print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : expanding dataframe", end='')
+
             X_transformed = pd.concat([X_transformed, expand_df], axis=1)
+
         X_transformed.drop(columns=self.cols_to_expand_, inplace=True)
+        self.output_shape_ = X_transformed.shape
+
         print(f"\r[EmbeddingExpander] - Done\t\t\t")
         return X_transformed
+
+    def _make_array_like(self, /, encoded_text: Any) -> Any:
+        if isinstance(encoded_text, str):
+            s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
+            s = [v for v in s if v != '']
+            return s
+        return encoded_text
 
 
 class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
@@ -344,7 +366,7 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
             y (Any, optional): The predictions dataset. Defaults to None.
 
         Returns:
-            `MissingEmbeddingFiller`: The fitted transformer.
+            MissingEmbeddingFiller: The fitted transformer.
         """
         return self
 

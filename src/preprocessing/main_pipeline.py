@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 
-OUTPUT_DATA_PATH: Path = Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/data/clean/")
+OUTPUT_DATA_PATH: Path = Path("/home/wsladmin/fibonaccos/projects/rakuten-multimodal-classification/data/clean/X_train.csv")
 
 
 def pipe() -> None:
@@ -36,15 +36,14 @@ def text_pipe() -> None:
 
     pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
                            ("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
-                           ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS))],
-                    verbose=True)
+                           ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS))])
 
     print("Pipeline started")
     X_train = pd.DataFrame(pipe.transform(X_train), columns=columns)
     print("Pipeline finished")
 
     print("Saving ...")
-    X_train.to_csv(OUTPUT_DATA_PATH / "X_train.csv", index=False)
+    X_train.to_csv(OUTPUT_DATA_PATH, index=False)
     return None
 
 
