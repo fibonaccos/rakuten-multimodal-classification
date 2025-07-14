@@ -19,7 +19,10 @@ __all__ = ["DATASET_TEXT_PATH",
            "Vectorizer"]
 
 
-DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(), "xtest": Path(), "ytrain": Path(), "ytest": Path()}
+DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/data/X_train.csv"),
+                                      "xtest": Path("../../../data/X_test.csv"),
+                                      "ytrain": Path("../../../data/Y_train.csv"),
+                                      "ytest": Path("../../../data/Y_train.csv")}
 """ Paths to local textual datasets (keyed as "xtrain", "xtest", "ytrain", "ytest") given as a dict. """
 
 
@@ -42,15 +45,20 @@ MAX_TOKENS_VECTORIZER: int = 500
 
 class CharacterCleaner(BaseEstimator, TransformerMixin):
     """
-    A transformer to clean textual data and keep characters from `ACCEPTED_CHARACTERS`. It inherits from `sklearn`
-    objects to have compatibility with its `Pipeline` object.
+    A transformer to clean textual data and keep characters from `ACCEPTED_CHARACTERS`.
     """
     def __init__(self) -> None:
+        """
+        Create a `CharacterCleaner` instance.
+
+        Returns:
+            `CharacterCleaner`: A new instance of `CharacterCleaner`.
+        """
         super().__init__()
         self.accepted_characters_: list[int] = ACCEPTED_CHARACTERS
         return None
 
-    def fit(self, X: pd.DataFrame, y: Any = None) -> CharacterCleaner:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> CharacterCleaner:
         """
         Does nothing. Here for `sklearn` API compatibility only.
 
@@ -63,7 +71,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         """
         return self 
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
         Apply to the textual columns of the dataset the following transformations :
         - `_clean_html`
@@ -74,20 +82,23 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         The textual columns match those found in `TEXTUAL_COLUMNS`.
 
         Args:
-            X (pd.DataFrame): The dataset to transform.
+            X (pd.DataFrame): The dataframe to transform.
 
         Returns:
-            pd.DataFrame: The dataset with clean textual columns.
+            pd.DataFrame: A new dataframe with clean textual columns.
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        for col in TEXTUAL_COLUMNS:
-            X_transformed[col].apply(self._clean_html, inplace=True)
-            X_transformed[col].apply(self._clean_xml, inplace=True)
-            X_transformed[col].apply(self._keep_accepted_characters, inplace=True)
-            X_transformed[col].apply(self._clean_text_format, inplace=True)
+        for i, col in enumerate(TEXTUAL_COLUMNS):
+            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : html cleaning", end='')
+            X_transformed[col] = X_transformed[col].apply(self._clean_html)
+            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : keep characters", end='')
+            X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
+            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : format cleaning", end='')
+            X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
+        print("\r[CharacterCleaner] - Done\t\t\t")
         return X_transformed
 
-    def _clean_html(self, text: Any) -> Any:
+    def _clean_html(self, /, text: Any) -> Any:
         """
         Use `BeautifulSoup4` HTML parser to clean a text from its HTML components. Applied in the
         pipeline on each row of the textual columns. If `text` comes from a `pd.DataFrame`, it ignores
@@ -103,23 +114,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
         return text
 
-    def _clean_xml(self, text: Any) -> Any:
-        """
-        Use `BeautifulSoup4` XML parser to clean a text from its XML components. Applied in the
-        pipeline on each row of the textual columns. If `text` comes from a `pd.DataFrame`, it
-        ignores missing values.
-
-        Args:
-            text (str): The text to clean.
-
-        Returns:
-            str: The cleaned text.
-        """
-        if isinstance(text, str):
-            return BeautifulSoup(text.strip(), "lxml").get_text(separator=" ").strip()
-        return text
-
-    def _keep_accepted_characters(self, text: Any) -> Any:
+    def _keep_accepted_characters(self, /, text: Any) -> Any:
         """
         Remove all characters from a text that is not found in `ACCEPTED_CHARACTERS`. Applied in the
         pipeline on each row of the textual columns. If `text` comes from a `pd.DataFrame`, it ignores
@@ -135,7 +130,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             return ''.join(c for c in text if ord(c) in self.accepted_characters_)
         return text
 
-    def _clean_text_format(self, text: Any) -> Any:
+    def _clean_text_format(self, /, text: Any) -> Any:
         """
         Remove some unconvenient patterns from a text with regex : overspacing, mail address, links, etc.
         If `text` comes from a `pd.DataFrame`, it ignores missing values.
@@ -163,11 +158,11 @@ class Vectorizer(BaseEstimator, TransformerMixin):
     representing the text that have to be aggregated. They can be aggregated by mean or by their
     maximum value.
     """
-    def __init__(self,
+    def __init__(self, /,
                  model: Literal["paraphrase-multilingual-MiniLM-L12-v2",
                                 "distiluse-base-multilingual-cased-v1",
                                 "paraphrase-multilingual-mpnet-base-v2"],
-                 aggregate: Literal["mean", "max"] = "mean") -> None:
+                 combine_method: Literal["mean", "max"] = "mean") -> None:
         """
         Create a `Vectorizer` instance.
 
@@ -178,15 +173,19 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 is very effective but slow (space dimension : 768).
             combine_method (Literal[&quot;mean&quot;, &quot;max&quot;], optional): The combining
                 method for vectorization. Defaults to "mean".
+
+        Returns:
+            `Vectorizer`: A new instance of `Vectorizer`.
         """
         super().__init__()
         nltk.download("punkt")
+        nltk.download('punkt_tab')
         self.max_chars_: int = MAX_TOKENS_VECTORIZER
-        self.aggregate_method_: Literal["mean", "max"] = aggregate
+        self.combine_method_: Literal["mean", "max"] = combine_method
         self.model_: SentenceTransformer = SentenceTransformer(model)
         return None
 
-    def fit(self, X: pd.DataFrame, y: Any = None) -> Vectorizer:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> Vectorizer:
         """
         Does nothing. Here for `sklearn` API compatibility only.
 
@@ -199,22 +198,24 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
         return self
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
         Build embeddings of the textual columns of `X`. 
 
         Args:
-            X (pd.DataFrame): The dataset to transform.
+            X (pd.DataFrame): The dataframe to transform.
 
         Returns:
-            pd.DataFrame: The dataset with embedded textual columns.
+            pd.DataFrame: A new dataframe with embedded textual columns.
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        for col in TEXTUAL_COLUMNS:
-            X_transformed[col].apply(self._encoder, inplace=True)
+        for i, col in enumerate(TEXTUAL_COLUMNS):
+            print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)} : embedding", end='')
+            X_transformed[col] = X_transformed[col].apply(self._encoder)
+        print("\r[Vectorizer] - Done\t\t\t",)
         return X_transformed
 
-    def _split_text(self, text: str) -> list[str]:
+    def _split_text(self, /, text: str) -> list[str]:
         """
         Splits a text to a list of subtexts containing less than `MAX_TOKENS_VECTORIZER` tokens.
 
@@ -225,7 +226,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             list[str]: The splitted text with less than `MAX_TOKENS_VECTORIZER` tokens for each
                 subtext.
         """
-        sentences: list[str] = sent_tokenize(text)
+        sentences: list[str] = sent_tokenize(text, language="french")
         chunks: list[str] = []
         current: str = ""
         for sent in sentences:
@@ -238,7 +239,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             chunks.append(current.strip())
         return chunks
 
-    def _encoder(self, text: Any) -> Any:
+    def _encoder(self, /, text: Any) -> Any:
         """
         Create an embedding of a text. If `text` comes from a `pd.DataFrame`, it
         ignores missing values.
@@ -252,3 +253,101 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         if isinstance(text, str):
             return np.mean(self.model_.encode(self._split_text(text)), axis=0)
         return text
+
+
+class EmbeddingExpander(BaseEstimator, TransformerMixin):
+    """
+    A transformer to expand embedded columns passed into the `Vectorizer` transformer. If multiple columns
+    have been embedded, it expands them as `column_name_i` where `i` is the i-th dimension of the embedding.
+    """
+    def __init__(self, /, cols_to_expand: list[str] = []) -> None:
+        """
+        Create an `EmbeddingExpander` instance.
+
+        Args:
+            cols_to_expand (list[str], optional): The columns to expand. If the provided list is empty, the
+                dataframe will remain unchanged after the transformation. Defaults to [].
+
+        Returns:
+            `EmbeddingExpander`: A new instance of `EmbeddingExpander`.
+        """
+        super().__init__()
+        self.cols_to_expand_: list[str] = cols_to_expand
+        self.output_shape_: tuple[int, int] = (0, 0)
+        return None
+
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingExpander:
+        """
+        Does nothing. Here for `sklearn` API compatibility only.
+
+        Args:
+            X (pd.DataFrame): The variables dataset.
+            y (Any, optional): The predictions dataset. Defaults to None.
+
+        Returns:
+            `EmbeddingExpander`: The fitted transformer.
+        """
+        return self
+
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Expand the embedded columns provided by `cols_to_expand` attribute.
+
+        Args:
+            X (pd.DataFrame): The dataframe to transform.
+
+        Returns:
+            pd.DataFrame: A new dataframe with expanded columns.
+        """
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        for i, col in enumerate(self.cols_to_expand_):
+            expand_size = len(next(v for v in X_transformed[col] if isinstance(v, np.ndarray)))
+            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : computing vectors", end='')
+            vectors = np.stack([v if isinstance(v, np.ndarray) else np.zeros(expand_size) for v in X_transformed[col]])
+            col_names = [col + "_" + str(i) for i in range(expand_size)]
+            expand_df = pd.DataFrame(vectors, columns=col_names, index=X_transformed.index)
+            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : expanding dataframe", end='')
+            X_transformed = pd.concat([X_transformed, expand_df], axis=1)
+        X_transformed.drop(columns=self.cols_to_expand_, inplace=True)
+        print(f"\r[EmbeddingExpander] - Done\t\t\t")
+        return X_transformed
+
+
+class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
+    """
+    A transformer to fill missing values from the *description* column. It fills the missing values by
+    sampling from the distribution of existing values for each class.
+    """
+    def __init__(self, /, mode: Literal["naive", "sampling"] = "naive") -> None:
+        """
+        Create a `MissingEmbeddingFiller` instance.
+
+        Args:
+            mode (Literal[&quot;naive&quot;, &quot;sampling&quot;], optional): The method of filling values.
+                If "naive", it will fill the missing descriptions with the corresponding titles. If "sampling",
+                it will draw a sample from the available descriptions of the corresponding class. Defaults
+                to "naive".
+
+        Returns:
+            MissingEmbeddingFiller: A new `MissingEmbeddingFiller` instance.
+        """
+        super().__init__()
+        self.mode_: str = mode
+        return None
+
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MissingEmbeddingFiller:
+        """
+        Does nothing. Here for `sklearn` API compatibility only.
+
+        Args:
+            X (pd.DataFrame): The variables dataset.
+            y (Any, optional): The predictions dataset. Defaults to None.
+
+        Returns:
+            `MissingEmbeddingFiller`: The fitted transformer.
+        """
+        return self
+
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        return X_transformed
