@@ -16,7 +16,9 @@ __all__ = ["DATASET_TEXT_PATH",
            "ACCEPTED_CHARACTERS",
            "MAX_TOKENS_VECTORIZER",
            "CharacterCleaner",
-           "Vectorizer"]
+           "Vectorizer",
+           "EmbeddingExpander",
+           "MissingEmbeddingFiller"]
 
 
 DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
