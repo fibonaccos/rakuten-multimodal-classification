@@ -19,11 +19,9 @@ __all__ = ["DATASET_TEXT_PATH",
            "Vectorizer"]
 
 
-DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path("/home/wsladmin/fibonaccos/projects/data/X_train.csv"),
-                                      "xtest": Path("../../../data/X_test.csv"),
-                                      "ytrain": Path("../../../data/Y_train.csv"),
-                                      "ytest": Path("../../../data/Y_train.csv")}
-""" Paths to local textual datasets (keyed as "xtrain", "xtest", "ytrain", "ytest") given as a dict. """
+DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
+                                      "ytrain": Path(__file__).cwd() / "../data/Y_train.csv"}
+""" Paths to local textual datasets (keyed as "xtrain", "ytrain") given as a dict. """
 
 
 TEXTUAL_COLUMNS: list[str] = ["designation", "description"]
@@ -89,16 +87,12 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : html cleaning", end='')
+            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
             X_transformed[col] = X_transformed[col].apply(self._clean_html)
-
-            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : keep characters", end='')
             X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
-
-            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)} : format cleaning", end='')
             X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
 
-        print("\r[CharacterCleaner] - Done\t\t\t")
+        print("\r[CharacterCleaner] - DONE    ")
         return X_transformed
 
     def _clean_html(self, /, text: Any) -> Any:
@@ -164,8 +158,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
     def __init__(self, /,
                  model: Literal["paraphrase-multilingual-MiniLM-L12-v2",
                                 "distiluse-base-multilingual-cased-v1",
-                                "paraphrase-multilingual-mpnet-base-v2"],
-                 combine_method: Literal["mean", "max"] = "mean") -> None:
+                                "paraphrase-multilingual-mpnet-base-v2"]) -> None:
         """
         Create a `Vectorizer` instance.
 
@@ -184,7 +177,6 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         nltk.download("punkt")
         nltk.download('punkt_tab')
         self.max_chars_: int = MAX_TOKENS_VECTORIZER
-        self.combine_method_: Literal["mean", "max"] = combine_method
         self.model_: SentenceTransformer = SentenceTransformer(model)
         return None
 
@@ -213,9 +205,9 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)} : embedding", end='')
+            print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
             X_transformed[col] = X_transformed[col].apply(self._encoder)
-        print("\r[Vectorizer] - Done\t\t\t")
+        print("\r[Vectorizer] - DONE    ")
         return X_transformed
 
     def _split_text(self, /, text: str) -> list[str]:
@@ -303,28 +295,25 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with expanded columns.
         """
         X_transformed: pd.DataFrame = X.copy(deep=True)
+        expanded_cols_names: dict[str, list[str]] = {col: [] for col in TEXTUAL_COLUMNS}
         for i, col in enumerate(self.cols_to_expand_):
-            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : making array-like", end='')
-            X_transformed[col] = X_transformed[col].apply(self._make_array_like)
+            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)}", end='')
 
             expand_size = len(X_transformed[~X_transformed[col].isna()].reset_index()[col][0])
-            col_names = [col + "_" + str(i + 1) for i in range(expand_size)]
+            X_transformed[col] = X_transformed[col].fillna(str(np.zeros(expand_size)))
+            X_transformed[col] = X_transformed[col].apply(self._make_array_like)
 
-            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : computing vectors", end='')
+            expanded_cols_names[col] = [col + "_" + str(i + 1) for i in range(expand_size)]
 
-            vectors = np.stack([v if isinstance(v, list) else np.zeros(expand_size) for v in X_transformed[col]])
-            print(vectors.shape)
-            expand_df = pd.DataFrame(vectors, columns=col_names, index=X.index)
-            print(expand_df.shape)
-
-            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : expanding dataframe", end='')
-
+            vectors = np.stack([v for v in X_transformed[col]])
+            expand_df = pd.DataFrame(vectors, columns=expanded_cols_names[col], index=X.index)
             X_transformed = pd.concat([X_transformed, expand_df], axis=1)
+            X_transformed[col + "_" + "norm"] = X_transformed[expanded_cols_names[col]].apply(lambda row: np.abs(row.astype('float').values).sum(), axis=1)
 
-        X_transformed.drop(columns=self.cols_to_expand_, inplace=True)
+        X_transformed = X_transformed.drop(columns=self.cols_to_expand_)
         self.output_shape_ = X_transformed.shape
 
-        print(f"\r[EmbeddingExpander] - Done\t\t\t")
+        print(f"\r[EmbeddingExpander] - DONE    ")
         return X_transformed
 
     def _make_array_like(self, /, encoded_text: Any) -> Any:
@@ -371,5 +360,19 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        print(f"\r[MissingEmbeddingFiller] ...", end='')
         X_transformed: pd.DataFrame = X.copy(deep=True)
+        if self.mode_ == "naive":
+            return self._naive_transform(X_transformed)
+        if self.mode_ == "sampling":
+            return X_transformed
         return X_transformed
+
+    def _naive_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        description_cols = [col for col in X.columns if "description" in col]
+        description_cols.remove("description_norm")
+        designation_cols = [col for col in X.columns if "designation" in col]
+        designation_cols.remove("designation_norm")
+        X.loc[X["description_norm"] == 0, description_cols] = X[X["description_norm"] == 0][designation_cols].values
+        print(f"\r[MissingEmbeddingFiller] - DONE    ")
+        return X
