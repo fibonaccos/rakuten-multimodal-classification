@@ -41,8 +41,8 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
 
     preparation_pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
                                        ("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
-                                       ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS))])#,
-                                       #("filling_missing_values", tpipe.MissingEmbeddingFiller(mode="naive"))])
+                                       ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
+                                       ("filling_missing_values", tpipe.MissingEmbeddingFiller(mode="naive"))])
 
     print("Preparation pipeline started")
 

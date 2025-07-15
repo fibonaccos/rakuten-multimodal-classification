@@ -363,9 +363,10 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
         print(f"\r[MissingEmbeddingFiller] ...", end='')
         X_transformed: pd.DataFrame = X.copy(deep=True)
         if self.mode_ == "naive":
-            return self._naive_transform(X_transformed)
+            X_transformed = self._naive_transform(X_transformed)
         if self.mode_ == "sampling":
             return X_transformed
+        print(f"\r[MissingEmbeddingFiller] - DONE")
         return X_transformed
 
     def _naive_transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -373,6 +374,7 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
         description_cols.remove("description_norm")
         designation_cols = [col for col in X.columns if "designation" in col]
         designation_cols.remove("designation_norm")
-        X.loc[X["description_norm"] == 0, description_cols] = X[X["description_norm"] == 0][designation_cols].values
-        print(f"\r[MissingEmbeddingFiller] - DONE    ")
+        for i in range(len(description_cols)):
+            X.loc[X["description_norm"] == 0, f"description_{i + 1}"] = X.loc[X["description_norm"] == 0, f"designation_{i + 1}"]
+        X.loc[X["description_norm"] == 0, "description_norm"] = X.loc[X["description_norm"] == 0, "designation_norm"]
         return X
