@@ -307,7 +307,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : making array-like", end='')
             X_transformed[col] = X_transformed[col].apply(self._make_array_like)
 
-            expand_size = len(X[~X[col].isna()].reset_index()[col][0])
+            expand_size = len(X_transformed[~X_transformed[col].isna()].reset_index()[col][0])
             col_names = [col + "_" + str(i + 1) for i in range(expand_size)]
 
             print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)} : computing vectors", end='')
