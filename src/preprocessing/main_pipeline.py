@@ -31,7 +31,7 @@ def text_pipe() -> None:
     9. Sauvegarde -> ok
     """
     print("Reading csv ...")
-    X_train = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0).iloc[:1000]
+    X_train = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0).iloc[:100]
     columns = X_train.columns
 
     pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
