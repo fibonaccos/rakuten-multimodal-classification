@@ -75,8 +75,8 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         """
         Apply to the textual columns of the dataset the following transformations :
         - `_clean_html`
-        - `_clean_xml`
         - `_keep_accepted_characters`
+        - `_clean_text_format`
 
         These are methods of the class `CharacterCleaner`. See their documentations for more details.
         The textual columns match those found in `TEXTUAL_COLUMNS`.
