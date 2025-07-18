@@ -6,7 +6,8 @@ from pathlib import Path
 import pandas as pd
 
 
-OUTPUT_DATA_PATH: Path = Path(__file__).cwd() / "data/clean/X_data.csv"
+OUTPUT_DATA_PATH: dict[str, Path] = {"train": Path(__file__).cwd() / "data/clean/train.csv",
+                                     "test": Path(__file__).cwd() / "data/clean/test.csv"}
 
 
 def pipe() -> None:
@@ -33,24 +34,38 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
     """
     print("Reading raw data ...")
     if nrows > 0:
-        X_data = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0, nrows=nrows)
-        y_data = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0, nrows=nrows)
+        X = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0, nrows=nrows)
+        y = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0, nrows=nrows)
     else:
-        X_data = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0)
-        y_data = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0)
+        X = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0)
+        y = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0)
 
-    preparation_pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
-                                       ("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
-                                       ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
-                                       ("filling_missing_values", tpipe.MissingEmbeddingFiller(mode="naive"))])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=random_state)
 
-    print("Preparation pipeline started")
+    pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
+                           ("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
+                           ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
+                           ("filling_missing_values", tpipe.MissingDescriptionFiller(mode="naive"))])
 
-    X_clean = preparation_pipe.transform(X_data)
+    print("Pipeline started")
 
-    print("Preparation pipeline finished")
+    pipe.fit(X_train, y_train)
 
-    pd.DataFrame(X_clean).to_csv(OUTPUT_DATA_PATH, index=False)
+    clean_X_train = pipe.transform(X_train)
+    clean_X_test = pipe.transform(X_test)
+
+    print("Pipeline finished")
+    print("Saving data ...")
+
+    clean_train = pd.DataFrame(clean_X_train)
+    clean_train['labels'] = y_train
+    clean_test = pd.DataFrame(clean_X_test)
+    clean_test['labels'] = y_test
+
+    clean_train.to_csv(OUTPUT_DATA_PATH["train"], index=False)
+    clean_test.to_csv(OUTPUT_DATA_PATH["test"], index=False)
+
+    print("Preprocessing done.")
     return None
 
 
@@ -67,4 +82,4 @@ def image_pipe() -> None:
     return None
 
 
-text_pipe(random_state=42, nrows=100)
+text_pipe(train_size=0.7, random_state=42, nrows=100)

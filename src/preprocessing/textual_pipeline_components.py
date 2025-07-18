@@ -18,7 +18,7 @@ __all__ = ["DATASET_TEXT_PATH",
            "CharacterCleaner",
            "Vectorizer",
            "EmbeddingExpander",
-           "MissingEmbeddingFiller"]
+           "MissingDescriptionFiller"]
 
 
 DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
@@ -238,14 +238,14 @@ class Vectorizer(BaseEstimator, TransformerMixin):
 
     def _encoder(self, /, text: Any) -> Any:
         """
-        Create an embedding of a text. If `text` comes from a `pd.DataFrame`, it
-        ignores missing values.
+        Create an embedding of a text. Ignores missing values.
 
         Args:
             text (str | Any): The text to vectorize.
 
         Returns:
-            np.ndarray | Any: The result of embedding if `text` is not a missing value
+            np.ndarray | Any: The result of embedding if `text` is not a missing value, else returns
+                the `text` unchanged.
         """
         if isinstance(text, str):
             return np.mean(self.model_.encode(self._split_text(text), convert_to_numpy=True), axis=0)
@@ -257,13 +257,12 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
     A transformer to expand embedded columns passed into the `Vectorizer` transformer. If multiple columns
     have been embedded, it expands them as `column_name_i` where `i` is the i-th dimension of the embedding.
     """
-    def __init__(self, /, cols_to_expand: list[str] = []) -> None:
+    def __init__(self, /, cols_to_expand: list[str]) -> None:
         """
         Create an `EmbeddingExpander` instance.
 
         Args:
-            cols_to_expand (list[str], optional): The columns to expand. If the provided list is empty, the
-                dataframe will remain unchanged after the transformation. Defaults to [].
+            cols_to_expand (list[str]): The columns to expand.
 
         Returns:
             `EmbeddingExpander`: A new instance of `EmbeddingExpander`.
@@ -326,14 +325,14 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         return encoded_text
 
 
-class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
+class MissingDescriptionFiller(BaseEstimator, TransformerMixin):
     """
     A transformer to fill missing values from the *description* column. It fills the missing values by
     sampling from the distribution of existing values for each class.
     """
     def __init__(self, /, mode: Literal["naive", "sampling"] = "naive") -> None:
         """
-        Create a `MissingEmbeddingFiller` instance.
+        Create a `MissingDescriptionFiller` instance.
 
         Args:
             mode (Literal[&quot;naive&quot;, &quot;sampling&quot;], optional): The method of filling values.
@@ -342,13 +341,13 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
                 to "naive".
 
         Returns:
-            MissingEmbeddingFiller: A new `MissingEmbeddingFiller` instance.
+            MissingDescriptionFiller: A new `MissingDescriptionFiller` instance.
         """
         super().__init__()
         self.mode_: str = mode
         return None
 
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MissingEmbeddingFiller:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MissingDescriptionFiller:
         """
         Does nothing. Here for `sklearn` API compatibility only.
 
@@ -357,12 +356,12 @@ class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
             y (Any, optional): The predictions dataset. Defaults to None.
 
         Returns:
-            MissingEmbeddingFiller: The fitted transformer.
+            MissingDescriptionFiller: The fitted transformer.
         """
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
-        print(f"\r[MissingEmbeddingFiller] ...", end='')
+        print(f"\r[MissingDescriptionFiller] ...", end='')
         X_transformed: pd.DataFrame = X.copy(deep=True)
         if self.mode_ == "naive":
             X_transformed = self._naive_transform(X_transformed)
