@@ -18,7 +18,7 @@ __all__ = ["DATASET_TEXT_PATH",
            "CharacterCleaner",
            "Vectorizer",
            "EmbeddingExpander",
-           "MissingDescriptionFiller"]
+           "NaiveDescriptionFiller"]
 
 
 DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
@@ -52,7 +52,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Create a `CharacterCleaner` instance.
 
         Returns:
-            `CharacterCleaner`: A new instance of `CharacterCleaner`.
+            CharacterCleaner: A new instance of `CharacterCleaner`.
         """
         super().__init__()
         self.accepted_characters_: list[int] = ACCEPTED_CHARACTERS
@@ -173,7 +173,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 method for vectorization. Defaults to "mean".
 
         Returns:
-            `Vectorizer`: A new instance of `Vectorizer`.
+            Vectorizer: A new instance of `Vectorizer`.
         """
         super().__init__()
         nltk.download("punkt")
@@ -197,7 +197,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Build embeddings of the textual columns of `X`. 
+        Build embeddings of the textual columns of `X` using a prefitted `SentenceTransformer` model. 
 
         Args:
             X (pd.DataFrame): The dataframe to transform.
@@ -265,7 +265,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             cols_to_expand (list[str]): The columns to expand.
 
         Returns:
-            `EmbeddingExpander`: A new instance of `EmbeddingExpander`.
+            EmbeddingExpander: A new instance of `EmbeddingExpander`.
         """
         super().__init__()
         self.cols_to_expand_: list[str] = cols_to_expand
@@ -287,7 +287,9 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Expand the embedded columns provided by `cols_to_expand` attribute.
+        Expand the embedded columns provided by `cols_to_expand` attribute. Each column in `cols_to_expand`
+        must contains vectors in either string or numpy arrays format. Missing values are filled with
+        zero-like vectors.
 
         Args:
             X (pd.DataFrame): The dataframe to transform.
@@ -318,6 +320,16 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         return X_transformed
 
     def _make_array_like(self, /, encoded_text: Any) -> Any:
+        """
+        Preparation task before expanding the columns. Applied through the `transform` operation on each row of
+        each `cols_to_expand`'s column. Ignores missing values.
+
+        Args:
+            encoded_text (Any): Value to clean before expanding.
+
+        Returns:
+            Any: Cleaned value ready for expanding or `NaN`.
+        """
         if isinstance(encoded_text, str):
             s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
             s = [v for v in s if v != '']
@@ -325,14 +337,14 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         return encoded_text
 
 
-class MissingDescriptionFiller(BaseEstimator, TransformerMixin):
+class NaiveDescriptionFiller(BaseEstimator, TransformerMixin):
     """
     A transformer to fill missing values from the *description* column. It fills the missing values by
     sampling from the distribution of existing values for each class.
     """
-    def __init__(self, /, mode: Literal["naive", "sampling"] = "naive") -> None:
+    def __init__(self) -> None:
         """
-        Create a `MissingDescriptionFiller` instance.
+        Create a `NaiveDescriptionFiller` instance.
 
         Args:
             mode (Literal[&quot;naive&quot;, &quot;sampling&quot;], optional): The method of filling values.
@@ -341,13 +353,12 @@ class MissingDescriptionFiller(BaseEstimator, TransformerMixin):
                 to "naive".
 
         Returns:
-            MissingDescriptionFiller: A new `MissingDescriptionFiller` instance.
+            NaiveDescriptionFiller: A new `NaiveDescriptionFiller` instance.
         """
         super().__init__()
-        self.mode_: str = mode
         return None
 
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MissingDescriptionFiller:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> NaiveDescriptionFiller:
         """
         Does nothing. Here for `sklearn` API compatibility only.
 
@@ -356,26 +367,91 @@ class MissingDescriptionFiller(BaseEstimator, TransformerMixin):
             y (Any, optional): The predictions dataset. Defaults to None.
 
         Returns:
-            MissingDescriptionFiller: The fitted transformer.
+            NaiveDescriptionFiller: The fitted transformer.
         """
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
-        print(f"\r[MissingDescriptionFiller] ...", end='')
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        if self.mode_ == "naive":
-            X_transformed = self._naive_transform(X_transformed)
-        if self.mode_ == "sampling":
-            return X_transformed
-        print(f"\r[MissingEmbeddingFiller] - DONE")
-        return X_transformed
+        """
+        Replace missing values of the column `description` with the corresponding value in column `designation`.
 
-    def _naive_transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        Args:
+            X (pd.DataFrame): The dataframe to transform.
+
+        Returns:
+            pd.DataFrame: A new dataframe without missing values columns.
+        """
+        print(f"\r[NaiveDescriptionFiller] ...", end='')
         description_cols = [col for col in X.columns if "description" in col]
         description_cols.remove("description_norm")
         designation_cols = [col for col in X.columns if "designation" in col]
         designation_cols.remove("designation_norm")
         for i in range(len(description_cols)):
             X.loc[X["description_norm"] == 0, f"description_{i + 1}"] = X.loc[X["description_norm"] == 0, f"designation_{i + 1}"]
-        X.loc[X["description_norm"] == 0, "description_norm"] = X.loc[X["description_norm"] == 0, "designation_norm"]
+        X = X.drop(columns=['designation_norm', 'description_norm'])
+        print(f"\r[NaiveDescriptionFiller] - DONE")
         return X
+
+
+class EmbeddingScaler(BaseEstimator, TransformerMixin):
+    """
+    A transformer to scale data. It can uses `StandardScaler`, `RobustScaler` or `MinMaxScaler` from the sklearn
+    preprocessing module.
+    """
+    def __init__(self, /, scaling: Literal["standard", "robust", "minmax"] = "standard", excluded_cols: list[str] = []) -> None:
+        """
+        Create an `EmbeddingScaler` instance.
+
+        Args:
+            scaling (str): The type of scaling. "standard" for `StandardScaler`, "robust" for `RobustScaler`
+                or "minmax" for `MinMaxScaler`.
+            excluded_cols (list[str]): The columns to keep unchanged.
+
+        Returns:
+            EmbeddingScaler: A new instance of `EmbeddingScaler`.
+        """
+        super().__init__()
+        self.scaling_type_: Literal["standard", "robust", "minmax"] = scaling
+        self.excluded_cols_: list[str] = excluded_cols
+        self.used_cols_: list[str] = []
+        if scaling == "robust":
+            from sklearn.preprocessing import RobustScaler
+            self.scaler_ = RobustScaler()
+        elif scaling == "minmax":
+            from sklearn.preprocessing import MinMaxScaler
+            self.scaler_ = MinMaxScaler()
+        else:
+            from sklearn.preprocessing import StandardScaler
+            self.scaler_ = StandardScaler()
+        return None
+
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingScaler:
+        """
+        Fit the scaler to the data. Must be used on the train set.
+
+        Args:
+            X (pd.DataFrame): The training variables dataset.
+            y (Any, optional): The training predictions dataset. Defaults to None.
+
+        Returns:
+            EmbeddingScaler: The fitted transformer.
+        """
+        self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
+        self.scaler_.fit(X[self.used_cols_])
+        return self
+
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Scale the data using the given sklearn scaler. Does not apply on the `excluded_cols` columns.
+
+        Args:
+            X (pd.DataFrame): The dataframe to scale.
+
+        Returns:
+            pd.DataFrame: The scaled dataframe.
+        """
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        print(f"\r[EmbeddingScaler] ...", end='')
+        X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
+        print(f"\r[EmbeddingScaler] - DONE")
+        return X_transformed

@@ -21,12 +21,12 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
     """
     The textual datasets pipeline.
     1. Copier les datasets -> ok
-    2. Splitter les datasets \\
+    2. Splitter les datasets -> ok \\
     -> Début Pipeline sklearn
     3. CharacterCleaner sur xtrain et xtest -> ok
     4. Vectorisation sur xtrain et xtest -> ok
     5. Restructurer les datasets xtrain et xtest (éclatement des embeddings en colonnes) -> ok
-    6. Remplissage des valeurs manquantes
+    6. Remplissage des valeurs manquantes -> ok
     7. Re-sampling des classes \\
     -> Fin Pipeline sklearn
     8. Renommage des classes -> ok
@@ -45,22 +45,24 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
     pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner()),
                            ("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
                            ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
-                           ("filling_missing_values", tpipe.MissingDescriptionFiller(mode="naive"))])
+                           ("filling_missing_values", tpipe.NaiveDescriptionFiller()),
+                           ('scaling', tpipe.EmbeddingScaler(scaling="standard", excluded_cols=['productid', 'imageid', 'labels']))])
+    print("[Text] Pipeline started")
+    print("[Text] Transforming train data ...")
+    clean_X_train = pipe.fit_transform(X_train, y_train)
 
-    print("Pipeline started")
-
-    pipe.fit(X_train, y_train)
-
-    clean_X_train = pipe.transform(X_train)
+    print()
+    print("[Text] Transforming test data ...")
     clean_X_test = pipe.transform(X_test)
 
-    print("Pipeline finished")
-    print("Saving data ...")
+    print()
+    print("[Text] Pipeline finished")
+    print("[Text] Saving data ...")
 
     clean_train = pd.DataFrame(clean_X_train)
-    clean_train['labels'] = y_train
+    clean_train = pd.concat([clean_train, y_train], axis=1).rename(columns={'prdtypecode': 'labels'})
     clean_test = pd.DataFrame(clean_X_test)
-    clean_test['labels'] = y_test
+    clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
     clean_train.to_csv(OUTPUT_DATA_PATH["train"], index=False)
     clean_test.to_csv(OUTPUT_DATA_PATH["test"], index=False)
@@ -82,4 +84,4 @@ def image_pipe() -> None:
     return None
 
 
-text_pipe(train_size=0.7, random_state=42, nrows=100)
+text_pipe(nrows=500, random_state=42)
