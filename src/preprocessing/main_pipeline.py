@@ -47,6 +47,7 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
                            ("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
                            ("filling_missing_values", tpipe.NaiveDescriptionFiller()),
                            ('scaling', tpipe.EmbeddingScaler(scaling="standard", excluded_cols=['productid', 'imageid', 'labels']))])
+
     print("[Text] Pipeline started")
     print("[Text] Transforming train data ...")
     clean_X_train = pipe.fit_transform(X_train, y_train)
