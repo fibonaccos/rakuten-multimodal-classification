@@ -1,5 +1,6 @@
 import images_pipeline_components as ipipe
 import textual_pipeline_components as tpipe
+from time_utils import timer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from pathlib import Path
@@ -9,15 +10,17 @@ import pandas as pd
 OUTPUT_DATA_PATH: dict[str, Path] = {"train": Path(__file__).cwd() / "data/clean/train.csv",
                                      "test": Path(__file__).cwd() / "data/clean/test.csv"}
 
-
-def pipe() -> None:
+@timer
+def pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
     """
     The main preprocessing pipeline.
     """
+    text_pipe(nrows=nrows, random_state=random_state)
     return None
 
 
-def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -> None:
+@timer
+def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
     """
     The textual datasets pipeline.
     1. Copier les datasets -> ok
@@ -72,6 +75,7 @@ def text_pipe(train_size: float = 0.8, random_state: int = 42, nrows: int = 0) -
     return None
 
 
+@timer
 def image_pipe() -> None:
     """
     The image datasets pipeline.
@@ -85,4 +89,4 @@ def image_pipe() -> None:
     return None
 
 
-text_pipe(nrows=500, random_state=42)
+pipe(nrows=100, random_state=42)
