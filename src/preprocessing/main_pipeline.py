@@ -15,7 +15,8 @@ def pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> Non
     """
     The main preprocessing pipeline.
     """
-    text_pipe(nrows=nrows, random_state=random_state)
+    text_pipe(train_size=train_size, nrows=nrows, random_state=random_state)
+    image_pipe(train_size=train_size, nrows=nrows, random_state=random_state)
     return None
 
 
@@ -30,10 +31,11 @@ def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -
     4. Vectorisation sur xtrain et xtest -> ok
     5. Restructurer les datasets xtrain et xtest (éclatement des embeddings en colonnes) -> ok
     6. Remplissage des valeurs manquantes -> ok
-    7. Re-sampling des classes \\
+    7. Re-sampling des classes 
+    8. Scaling -> ok \\
     -> Fin Pipeline sklearn
-    8. Renommage des classes -> ok
-    9. Sauvegarde -> ok
+    9. Renommage des classes -> ok
+    10. Sauvegarde -> ok
     """
     print("Reading raw data ...")
     if nrows > 0:
@@ -76,7 +78,7 @@ def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -
 
 
 @timer
-def image_pipe() -> None:
+def image_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
     """
     The image datasets pipeline.
     1. Copier les datasets -> ok
