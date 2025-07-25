@@ -21,8 +21,8 @@ __all__ = ["DATASET_TEXT_PATH",
            "NaiveDescriptionFiller"]
 
 
-DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
-                                      "ytrain": Path(__file__).cwd() / "../data/Y_train.csv"}
+DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "data/raw/X_data.csv",
+                                      "ytrain": Path(__file__).cwd() / "data/raw/Y_data.csv"}
 """ Paths to local textual datasets (keyed as "xtrain", "ytrain") given as a dict. """
 
 
@@ -31,7 +31,7 @@ TEXTUAL_COLUMNS: list[str] = ["designation", "description"]
 
 
 # Lists of characters given as Unicode int that we may want to keep
-ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"]
+ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"]
 PONCTUATION_CHARACTERS: list[int] = [ord(c) for c in "!\"$%&'()+,-./\\:;?[]^_`|~"]
 ACCENTS_CHARACTERS: list[int] =  [ord(c) for c in 'àâäçéèêëîïôöùûüÿœæ']
 
