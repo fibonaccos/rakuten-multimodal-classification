@@ -321,6 +321,8 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             X_transformed = pd.concat([X_transformed, expand_df], axis=1)
             X_transformed[col + "_" + "norm"] = X_transformed[expanded_cols_names[col]].apply(lambda row: np.abs(row.astype('float').values).sum(), axis=1)
 
+            X_transformed[expanded_cols_names[col]] = X_transformed[expanded_cols_names[col]].astype("float")
+
         X_transformed = X_transformed.drop(columns=self.cols_to_expand_)
         self.output_shape_ = X_transformed.shape
 
@@ -368,7 +370,7 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         self.missing_values_mask_: pd.Series[bool] = pd.Series(dtype="bool")
         self.cols_: list[str] = []
         self.labels_: list[int] = []
-        self.labels_indices_: dict[int, pd.Index] = {}
+        self.labels_indices_: dict[int, pd.Series[bool]] = {}
         self.labels_stats_: dict[int, tuple[pd.Series, pd.Series]] = {}
         self.kdes_: dict[tuple[int, str], KernelDensity] = {}
         self.random_state_: int = random_state
@@ -390,19 +392,19 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         self.missing_values_mask_ = X["description_norm"] == 0
         self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
         self.labels_ = y["prdtypecode"].unique().tolist()
-        Xx: pd.DataFrame = X.copy(deep=True)
-        Xx[self.missing_values_mask_, self.cols_] = np.nan
+        Xx: pd.DataFrame = X[self.cols_].copy(deep=True)
+        Xx.loc[self.missing_values_mask_] = np.nan
         for k in self.labels_:
-            k_indices = y[y["prdtypecode"] == k].index
+            k_indices = y["prdtypecode"] == k
             self.labels_indices_[k] = k_indices
-            Xk = Xx.iloc[k_indices][self.cols_].dropna()
+            Xk = Xx.loc[k_indices].dropna()
             mk, sk = Xk.mean(axis=0), Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
             self.labels_stats_[k] = (mk, sk)
             Xk = (Xk - mk) / sk
             for col in self.cols_:
                 x = Xk[col].to_numpy()
                 kde = KernelDensity(kernel="gaussian")
-                kde.fit(x)
+                kde.fit(x.reshape(1, -1))
                 self.kdes_[(k, col)] = kde
         print("\r[LabelKDEImputer] - Fitting done.")
         return self
@@ -420,13 +422,13 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
 
         print("[LabelKDEImputer] - Transforming ...", end='')
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        X_transformed[self.missing_values_mask_, self.cols_] = np.nan
+        X_transformed.loc[self.missing_values_mask_, self.cols_] = np.nan
         for k in self.labels_:
-            Xk = X_transformed[self.labels_indices_[k]]
+            Xk = X_transformed.copy(deep=True).astype("float").loc[self.labels_indices_[k], self.cols_]
             Xk = (Xk - self.labels_stats_[k][0]) / self.labels_stats_[k][1]
             for col in self.cols_:
                 nan_mask = Xk[col].isna()
-                Xk[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=nan_mask.shape[0], random_state=self.random_state_)
+                Xk.loc[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=len(nan_mask.to_list()), random_state=self.random_state_)
             X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
         print("\r[LabelKDEImputer] - Transforming done.")
         print("[LabelKDEImputer] - DONE")
@@ -485,7 +487,7 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
         designation_cols = [col for col in X_transformed.columns if "designation" in col]
         description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
         new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
-        X_transformed[X_transformed["description_norm"] == 0][description_cols] = X_transformed[designation_cols]
+        X_transformed.loc[X_transformed["description_norm"] == 0, description_cols] = X_transformed[X_transformed["description_norm"] == 0, designation_cols]
         if self.rule_ == "abs":
             for i in range(len(new_cols)):
                 X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)

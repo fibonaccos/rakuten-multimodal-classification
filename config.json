@@ -1,13 +1,13 @@
 {
     "PREPROCESSING": {
         "PATHS": {
-            "rawTextData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/X_train.csv",
-            "rawImageFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/images/",
-            "rawLabels": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/Y_train.csv",
-            "cleanTextTrainData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_train.csv",
-            "cleanTextTestData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_test.csv",
-            "cleanImageTrainFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_train/",
-            "cleanImageTestFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_test/"
+            "rawTextData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/X_train.csv",
+            "rawImageFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/images/",
+            "rawLabels": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/Y_train.csv",
+            "cleanTextTrainData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_train.csv",
+            "cleanTextTestData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_test.csv",
+            "cleanImageTrainFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_train/",
+            "cleanImageTestFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_test/"
         },
         "CONSTANTS": {
             "textualColumns": ["designation", "description"],
@@ -25,7 +25,7 @@
                     {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
                     {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
                     {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
-                    {"stepName": "missing_values_imputing", "transformer": "LabelKDEImputer", "params": {"random_state": 4}}
+                    {"stepName": "missing_values_imputing", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}}
                 ]
             },
             "IMAGEPIPELINE": {

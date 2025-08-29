@@ -18,31 +18,22 @@ PREPROCESSING_CONFIG = get_config("PREPROCESSING")
 
 
 @timer
-def pipe(train_size: float = 0.8) -> None:
+def pipe() -> None:
     """
     The main preprocessing pipeline.
     """
 
-    text_pipe(train_size=train_size)
+    text_pipe()
     return None
 
 
 @timer
-def text_pipe(train_size: float) -> None:
+def text_pipe() -> None:
     """
-    The textual datasets pipeline.
-    1. Copier les datasets -> ok
-    2. Splitter les datasets -> ok \\
-    -> Début Pipeline sklearn
-    3. CharacterCleaner sur xtrain et xtest -> ok
-    4. Vectorisation sur xtrain et xtest -> ok
-    5. Restructurer les datasets xtrain et xtest (éclatement des embeddings en colonnes) -> ok
-    6. Remplissage des valeurs manquantes -> ok
-    7. Re-sampling des classes 
-    8. Scaling -> ok \\
-    -> Fin Pipeline sklearn
-    9. Renommage des classes -> ok
-    10. Sauvegarde -> ok
+    Execute the text pipeline using the config.json file to set metadata.
+
+    Returns:
+        None:
     """
 
     print("Reading raw data ...")
@@ -53,7 +44,7 @@ def text_pipe(train_size: float) -> None:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=PREPROCESSING_CONFIG["PIPELINE"]["trainSize"], random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
 
     pipeline_steps: list[tuple[str, Any]] = [(step["stepName"], getattr(tpipe, step["transformer"])(**step["params"]))
                                              for step in PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["STEPS"]]
@@ -85,7 +76,7 @@ def text_pipe(train_size: float) -> None:
 
 
 @timer
-def image_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
+def image_pipe() -> None:
     """
     The image datasets pipeline.
     1. Copier les datasets -> ok
