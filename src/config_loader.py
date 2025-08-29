@@ -23,7 +23,3 @@ def get_config(key: str | None = None) -> Any:
     if key is None:
         return _config
     return _config.get(key)
-
-
-def resolve_path(path: str) -> Path:
-    return (ROOT_DIR / path).resolve()

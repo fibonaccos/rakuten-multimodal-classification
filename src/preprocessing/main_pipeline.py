@@ -11,7 +11,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from config_loader import get_config
+from src.config_loader import get_config
 
 
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")
@@ -22,6 +22,7 @@ def pipe(train_size: float = 0.8) -> None:
     """
     The main preprocessing pipeline.
     """
+
     text_pipe(train_size=train_size)
     return None
 
@@ -94,6 +95,7 @@ def image_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) 
 
     Rajout de process facilitée par la structure adaptative.
     """
+
     return None
 
 

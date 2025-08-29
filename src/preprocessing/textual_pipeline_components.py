@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any, Literal
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.neighbors import KernelDensity
 from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
@@ -14,12 +15,15 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from config_loader import get_config
+from src.config_loader import get_config
 
 
 __all__ = ["CharacterCleaner",
            "Vectorizer",
-           "EmbeddingExpander"]
+           "EmbeddingExpander",
+           "LabelKDEImputer",
+           "EmbeddingMerger",
+           "EmbeddingScaler"]
 
 
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")
@@ -39,13 +43,15 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
     """
     A transformer to clean textual data and keep characters from `ACCEPTED_CHARACTERS`.
     """
-    def __init__(self) -> None:
+
+    def __init__(self, /) -> None:
         """
         Create a `CharacterCleaner` instance.
 
         Returns:
             CharacterCleaner: A new instance of `CharacterCleaner`.
         """
+
         super().__init__()
         self.accepted_characters_: list[int] = ACCEPTED_CHARACTERS
         return None
@@ -61,6 +67,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             CharacterCleaner: The fitted transformer.
         """
+
         return self 
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -79,6 +86,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: A new dataframe with clean textual columns.
         """
+
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for i, col in enumerate(TEXTUAL_COLUMNS):
             print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
@@ -101,6 +109,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
+
         if isinstance(text, str):
             return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
         return text
@@ -117,6 +126,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
+
         if isinstance(text, str):
             return ''.join(c for c in text if ord(c) in self.accepted_characters_)
         return text
@@ -132,6 +142,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
+
         if isinstance(text, str):
             text = text.replace('\t', ' ')
             text = re.sub(r'\b[\w.-]+?@\w+?\.\w+?\b', '', text)
@@ -149,6 +160,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
     representing the text that have to be aggregated. They can be aggregated by mean or by their
     maximum value.
     """
+
     def __init__(self, /,
                  model: Literal["paraphrase-multilingual-MiniLM-L12-v2",
                                 "distiluse-base-multilingual-cased-v1",
@@ -165,6 +177,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         Returns:
             Vectorizer: A new instance of `Vectorizer`.
         """
+
         super().__init__()
         nltk.download("punkt")
         nltk.download('punkt_tab')
@@ -183,6 +196,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         Returns:
             Vectorizer: The fitted transformer.
         """
+
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -195,6 +209,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: A new dataframe with embedded textual columns.
         """
+
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for i, col in enumerate(TEXTUAL_COLUMNS):
             print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
@@ -213,6 +228,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             list[str]: The splitted text with less than `MAX_TOKENS_VECTORIZER` tokens for each
                 subtext.
         """
+
         sentences: list[str] = sent_tokenize(text, language="french")
         chunks: list[str] = []
         current: str = ""
@@ -237,6 +253,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             np.ndarray | Any: The result of embedding if `text` is not a missing value, else returns
                 the `text` unchanged.
         """
+
         if isinstance(text, str):
             return np.mean(self.model_.encode(self._split_text(text), convert_to_numpy=True), axis=0)
         return text
@@ -247,6 +264,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
     A transformer to expand embedded columns passed into the `Vectorizer` transformer. If multiple columns
     have been embedded, it expands them as `column_name_i` where `i` is the i-th dimension of the embedding.
     """
+
     def __init__(self, /) -> None:
         """
         Create an `EmbeddingExpander` instance.
@@ -254,6 +272,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingExpander: A new instance of `EmbeddingExpander`.
         """
+
         super().__init__()
         self.cols_to_expand_: list[str] = TEXTUAL_COLUMNS
         self.output_shape_: tuple[int, int] = (0, 0)
@@ -270,6 +289,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingExpander: The fitted transformer.
         """
+
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -284,6 +304,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: A new dataframe with expanded columns.
         """
+
         X_transformed: pd.DataFrame = X.copy(deep=True)
         expanded_cols_names: dict[str, list[str]] = {col: [] for col in TEXTUAL_COLUMNS}
         for i, col in enumerate(self.cols_to_expand_):
@@ -317,6 +338,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         Returns:
             Any: Cleaned value ready for expanding or `NaN`.
         """
+
         if isinstance(encoded_text, str):
             s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
             s = [v for v in s if v != '']
@@ -324,11 +346,161 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         return encoded_text
 
 
+class LabelKDEImputer(BaseEstimator, TransformerMixin):
+    """
+    A transformer to fill missing descriptions. It builds KDEs for each couple `(label, feature)` and fill missing
+    values randomly from these KDEs. Must be used after an `EmbeddingExpander` transformation. Note that it cannot
+    be used in production as it requires the label to choose from which KDE a missing description will be replaced.
+    """
+
+    def __init__(self, /, random_state: int) -> None:
+        """
+        Create a `LabelKDEImputer` instance.
+
+        Args:
+            random_state (int): The random state for reproducing results.
+
+        Returns:
+            LabelKDEImputer: A new `LabelKDEImputer` instance.
+        """
+
+        super().__init__()
+        self.missing_values_mask_: pd.Series[bool] = pd.Series(dtype="bool")
+        self.cols_: list[str] = []
+        self.labels_: list[int] = []
+        self.labels_indices_: dict[int, pd.Index] = {}
+        self.labels_stats_: dict[int, tuple[pd.Series, pd.Series]] = {}
+        self.kdes_: dict[tuple[int, str], KernelDensity] = {}
+        self.random_state_: int = random_state
+        return None
+
+    def fit(self, /, X: pd.DataFrame, y: pd.DataFrame) -> LabelKDEImputer:
+        """
+        Fit the imputer to the data. Must be used on the train set only.
+
+        Args:
+            X (pd.DataFrame): The training variables dataset.
+            y (pd.DataFrame): The training predictions dataset.
+
+        Returns:
+            LabelKDEImputer: The fitted transformer.
+        """
+
+        print("[LabelKDEImputer] - Fitting ...", end='')
+        self.missing_values_mask_ = X["description_norm"] == 0
+        self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
+        self.labels_ = y["prdtypecode"].unique().tolist()
+        Xx: pd.DataFrame = X.copy(deep=True)
+        Xx[self.missing_values_mask_, self.cols_] = np.nan
+        for k in self.labels_:
+            k_indices = y[y["prdtypecode"] == k].index
+            self.labels_indices_[k] = k_indices
+            Xk = Xx.iloc[k_indices][self.cols_].dropna()
+            mk, sk = Xk.mean(axis=0), Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
+            self.labels_stats_[k] = (mk, sk)
+            Xk = (Xk - mk) / sk
+            for col in self.cols_:
+                x = Xk[col].to_numpy()
+                kde = KernelDensity(kernel="gaussian")
+                kde.fit(x)
+                self.kdes_[(k, col)] = kde
+        print("\r[LabelKDEImputer] - Fitting done.")
+        return self
+
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply transformation on `X`.
+
+        Args:
+            X (pd.DataFrame): The dataframe on which impute values.
+
+        Returns:
+            pd.DataFrame: The dataframe without missing values.
+        """
+
+        print("[LabelKDEImputer] - Transforming ...", end='')
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        X_transformed[self.missing_values_mask_, self.cols_] = np.nan
+        for k in self.labels_:
+            Xk = X_transformed[self.labels_indices_[k]]
+            Xk = (Xk - self.labels_stats_[k][0]) / self.labels_stats_[k][1]
+            for col in self.cols_:
+                nan_mask = Xk[col].isna()
+                Xk[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=nan_mask.shape[0], random_state=self.random_state_)
+            X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
+        print("\r[LabelKDEImputer] - Transforming done.")
+        print("[LabelKDEImputer] - DONE")
+        return X_transformed
+
+
+class EmbeddingMerger(BaseEstimator, TransformerMixin):
+    """
+    Merge embedded features (designation and description) to reduce dimension and fill missing values.
+    """
+
+    def __init__(self, /, rule: Literal["mean", "abs"] = "mean") -> None:
+        """
+        Create a new `EmbeddingMerger` instance.
+
+        Args:
+            rule (Literal["mean", "abs"], Optional): The merging rule to use on the features. If "mean", takes the mean of
+                the `designation` and `description` embeddings. If "abs", takes the biggest value from an absolute
+                comparison, i.e. if v1 = -6 and v2 = 2, it takes v1. If a description is missing, it imputes the
+                designation value. Default to "mean".
+
+        Returns:
+            EmbeddingMerger: A new `EmbeddingMerger` instance.
+        """
+
+        super().__init__()
+        self.rule_: Literal["mean", "abs"] = rule
+        return None
+
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingMerger:
+        """
+        Does nothing. Here for `sklearn` API compatibility only.
+
+        Args:
+            X (pd.DataFrame): The variables dataset.
+            y (Any, optional): The predictions dataset. Defaults to None.
+
+        Returns:
+            EmbeddingMerger: The fitted transformer.
+        """
+
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Reduce the embeddings and fill missing descriptions.
+
+        Args:
+            X (pd.DataFrame): The dataframe on which apply the transformation.
+
+        Returns:
+            pd.DataFrame: The reduces dataframe withou missing values.
+        """
+
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        designation_cols = [col for col in X_transformed.columns if "designation" in col]
+        description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
+        new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
+        X_transformed[X_transformed["description_norm"] == 0][description_cols] = X_transformed[designation_cols]
+        if self.rule_ == "abs":
+            for i in range(len(new_cols)):
+                X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)
+        else:
+            X_transformed[new_cols] = 0.5 * (X_transformed[designation_cols] + X_transformed[description_cols])
+        X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
+        return X_transformed
+
+
 class EmbeddingScaler(BaseEstimator, TransformerMixin):
     """
     A transformer to scale data. It can uses `StandardScaler`, `RobustScaler` or `MinMaxScaler` from the sklearn
     preprocessing module.
     """
+
     def __init__(self, /, scaling: Literal["standard", "robust", "minmax"] = "standard", excluded_cols: list[str] = []) -> None:
         """
         Create an `EmbeddingScaler` instance.
@@ -341,6 +513,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingScaler: A new instance of `EmbeddingScaler`.
         """
+
         super().__init__()
         self.scaling_type_: Literal["standard", "robust", "minmax"] = scaling
         self.excluded_cols_: list[str] = excluded_cols
@@ -367,6 +540,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingScaler: The fitted transformer.
         """
+
         self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
         self.scaler_.fit(X[self.used_cols_])
         return self
@@ -381,6 +555,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: The scaled dataframe.
         """
+
         X_transformed: pd.DataFrame = X.copy(deep=True)
         print(f"\r[EmbeddingScaler] ...", end='')
         X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])

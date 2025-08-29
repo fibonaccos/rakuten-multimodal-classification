@@ -24,7 +24,8 @@
                 "STEPS": [
                     {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
                     {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
-                    {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}}
+                    {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
+                    {"stepName": "missing_values_imputing", "transformer": "LabelKDEImputer", "params": {"random_state": 4}}
                 ]
             },
             "IMAGEPIPELINE": {
