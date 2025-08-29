@@ -1,27 +1,33 @@
-import images_pipeline_components as ipipe
-import textual_pipeline_components as tpipe
-from time_utils import timer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-from pathlib import Path
+from typing import Any
+from utils import timer
 import pandas as pd
+import images_pipeline_components as ipipe
+import textual_pipeline_components as tpipe
+
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from config_loader import get_config
 
 
-OUTPUT_DATA_PATH: dict[str, Path] = {"train": Path(__file__).cwd() / "data/clean/train.csv",
-                                     "test": Path(__file__).cwd() / "data/clean/test.csv"}
+PREPROCESSING_CONFIG = get_config("PREPROCESSING")
+
 
 @timer
-def pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
+def pipe(train_size: float = 0.8) -> None:
     """
     The main preprocessing pipeline.
     """
-    text_pipe(train_size=train_size, nrows=nrows, random_state=random_state)
-    image_pipe(train_size=train_size, nrows=nrows, random_state=random_state)
+    text_pipe(train_size=train_size)
     return None
 
 
 @timer
-def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -> None:
+def text_pipe(train_size: float) -> None:
     """
     The textual datasets pipeline.
     1. Copier les datasets -> ok
@@ -37,21 +43,21 @@ def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -
     9. Renommage des classes -> ok
     10. Sauvegarde -> ok
     """
+
     print("Reading raw data ...")
-    if nrows > 0:
-        X = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0, nrows=nrows)
-        y = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0, nrows=nrows)
+    if PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"] <= 0:
+        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
+        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
     else:
-        X = pd.read_csv(tpipe.DATASET_TEXT_PATH["xtrain"], index_col=0)
-        y = pd.read_csv(tpipe.DATASET_TEXT_PATH["ytrain"], index_col=0)
+        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
+        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=random_state)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
 
-    pipe = Pipeline(steps=[("character_cleaning", tpipe.CharacterCleaner())])#,
-                           #("embedding", tpipe.Vectorizer(model="paraphrase-multilingual-MiniLM-L12-v2")),
-                           #("expanding", tpipe.EmbeddingExpander(cols_to_expand=tpipe.TEXTUAL_COLUMNS)),
-                           #("filling_missing_values", tpipe.NaiveDescriptionFiller()),
-                           #('scaling', tpipe.EmbeddingScaler(scaling="standard", excluded_cols=['productid', 'imageid', 'labels']))])
+    pipeline_steps: list[tuple[str, Any]] = [(step["stepName"], getattr(tpipe, step["transformer"])(**step["params"]))
+                                             for step in PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["STEPS"]]
+
+    pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
 
     print("[Text] Pipeline started")
     print("[Text] Transforming train data ...")
@@ -70,8 +76,8 @@ def text_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) -
     clean_test = pd.DataFrame(clean_X_test)
     clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
-    clean_train.to_csv(OUTPUT_DATA_PATH["train"], index=False)
-    clean_test.to_csv(OUTPUT_DATA_PATH["test"], index=False)
+    clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False)
+    clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False)
 
     print("Preprocessing done.")
     return None
@@ -91,4 +97,4 @@ def image_pipe(train_size: float = 0.8, nrows: int = 0, random_state: int = 42) 
     return None
 
 
-pipe(nrows=10, random_state=42)
+pipe()

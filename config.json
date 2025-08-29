@@ -1,0 +1,44 @@
+{
+    "PREPROCESSING": {
+        "PATHS": {
+            "rawTextData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/X_train.csv",
+            "rawImageFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/images/",
+            "rawLabels": "/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/Y_train.csv",
+            "cleanTextTrainData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_train.csv",
+            "cleanTextTestData": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_test.csv",
+            "cleanImageTrainFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_train/",
+            "cleanImageTestFolder": "/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_test/"
+        },
+        "CONSTANTS": {
+            "textualColumns": ["designation", "description"],
+            "alphanumCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+            "ponctuationCharacters": "!\"$%&'()+,-./\\:;?[]^_`|~",
+            "accentCharacters": "àâäçéèêëîïôöùûüÿœæ",
+            "maxTokenVectorizer": 500
+        },
+        "PIPELINE": {
+            "sampleSize": 5000,
+            "trainSize": 0.8,
+            "randomState": 42,
+            "TEXTPIPELINE": {
+                "STEPS": [
+                    {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
+                    {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
+                    {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}}
+                ]
+            },
+            "IMAGEPIPELINE": {
+                "STEPS": [
+                    {"stepName": "rotation", "transformer": "RotationTransformer", "params": {}},
+                    {"stepName": "symmetry", "transformer": "SymmetryTransformer", "params": {}},
+                    {"stepName": "zoom", "transformer": "ZoomTransformer", "params": {}},
+                    {"stepName": "blur", "transformer": "BlurTransformer", "params": {}},
+                    {"stepName": "coloration", "transformer": "ColorTransformer", "params": {}},
+                    {"stepName": "crop", "transformer": "CropTransformer", "params": {}},
+                    {"stepName": "noise", "transformer": "NoiseTransformer", "params": {}},
+                    {"stepName": "gap", "transformer": "GapTransformer", "params": {}}
+                ]
+            }
+        }
+    }
+}

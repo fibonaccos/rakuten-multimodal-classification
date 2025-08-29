@@ -24,6 +24,7 @@ def format_duration(duration):
         parts.append(f"{seconds*1000:.2f} ms")
     return ' '.join(parts)
 
+
 def timer(func):
     @wraps(func)
     def wrapper(*args, **kwargs):

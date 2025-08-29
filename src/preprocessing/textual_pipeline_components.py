@@ -1,46 +1,38 @@
 from __future__ import annotations
 from typing import Any, Literal
-from pathlib import Path
 from sklearn.base import BaseEstimator, TransformerMixin
 from bs4 import BeautifulSoup
-import re
-import nltk
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
+import re
+import nltk
+
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from config_loader import get_config
 
 
-__all__ = ["DATASET_TEXT_PATH",
-           "TEXTUAL_COLUMNS",
-           "ACCEPTED_CHARACTERS",
-           "MAX_TOKENS_VECTORIZER",
-           "CharacterCleaner",
+__all__ = ["CharacterCleaner",
            "Vectorizer",
-           "EmbeddingExpander",
-           "NaiveDescriptionFiller"]
+           "EmbeddingExpander"]
 
 
-DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "data/raw/X_data.csv",
-                                      "ytrain": Path(__file__).cwd() / "data/raw/Y_data.csv"}
-""" Paths to local textual datasets (keyed as "xtrain", "ytrain") given as a dict. """
+PREPROCESSING_CONFIG = get_config("PREPROCESSING")
 
+TEXTUAL_COLUMNS: list[str] = PREPROCESSING_CONFIG["CONSTANTS"]["textualColumns"]
 
-TEXTUAL_COLUMNS: list[str] = ["designation", "description"]
-""" Name of textual columns to preprocess found in the original datasets. """
-
-
-# Lists of characters given as Unicode int that we may want to keep
-ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"]
-PONCTUATION_CHARACTERS: list[int] = [ord(c) for c in "!\"$%&'()+,-./\\:;?[]^_`|~"]
-ACCENTS_CHARACTERS: list[int] =  [ord(c) for c in 'àâäçéèêëîïôöùûüÿœæ']
+ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in PREPROCESSING_CONFIG["CONSTANTS"]["alphanumCharacters"]]
+PONCTUATION_CHARACTERS: list[int] = [ord(c) for c in PREPROCESSING_CONFIG["CONSTANTS"]["ponctuationCharacters"]]
+ACCENTS_CHARACTERS: list[int] =  [ord(c) for c in PREPROCESSING_CONFIG["CONSTANTS"]["accentCharacters"]]
 
 ACCEPTED_CHARACTERS: list[int] = ALPHANUM_CHARACTERS + PONCTUATION_CHARACTERS + ACCENTS_CHARACTERS
-""" List of all the characters to keep encoded in integers. """
 
-
-MAX_TOKENS_VECTORIZER: int = 500
-""" The maximum number of tokens to use in `Vectorizer`. Depends on the model used. """
+MAX_TOKENS_VECTORIZER: int = PREPROCESSING_CONFIG["CONSTANTS"]["maxTokenVectorizer"]
 
 
 class CharacterCleaner(BaseEstimator, TransformerMixin):
@@ -169,8 +161,6 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 is recommended (space dimension : 384). The model **distiluse-base-multilingual-cased-v1** is
                 good but may be heavy (space dimension : 512). The model **paraphrase-multilingual-mpnet-base-v2**
                 is very effective but slow (space dimension : 768).
-            combine_method (Literal[&quot;mean&quot;, &quot;max&quot;], optional): The combining
-                method for vectorization. Defaults to "mean".
 
         Returns:
             Vectorizer: A new instance of `Vectorizer`.
@@ -257,18 +247,15 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
     A transformer to expand embedded columns passed into the `Vectorizer` transformer. If multiple columns
     have been embedded, it expands them as `column_name_i` where `i` is the i-th dimension of the embedding.
     """
-    def __init__(self, /, cols_to_expand: list[str]) -> None:
+    def __init__(self, /) -> None:
         """
         Create an `EmbeddingExpander` instance.
-
-        Args:
-            cols_to_expand (list[str]): The columns to expand.
 
         Returns:
             EmbeddingExpander: A new instance of `EmbeddingExpander`.
         """
         super().__init__()
-        self.cols_to_expand_: list[str] = cols_to_expand
+        self.cols_to_expand_: list[str] = TEXTUAL_COLUMNS
         self.output_shape_: tuple[int, int] = (0, 0)
         return None
 
@@ -335,62 +322,6 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             s = [v for v in s if v != '']
             return s
         return encoded_text
-
-
-class NaiveDescriptionFiller(BaseEstimator, TransformerMixin):
-    """
-    A transformer to fill missing values from the *description* column. It fills the missing values by
-    sampling from the distribution of existing values for each class.
-    """
-    def __init__(self) -> None:
-        """
-        Create a `NaiveDescriptionFiller` instance.
-
-        Args:
-            mode (Literal[&quot;naive&quot;, &quot;sampling&quot;], optional): The method of filling values.
-                If "naive", it will fill the missing descriptions with the corresponding titles. If "sampling",
-                it will draw a sample from the available descriptions of the corresponding class. Defaults
-                to "naive".
-
-        Returns:
-            NaiveDescriptionFiller: A new `NaiveDescriptionFiller` instance.
-        """
-        super().__init__()
-        return None
-
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> NaiveDescriptionFiller:
-        """
-        Does nothing. Here for `sklearn` API compatibility only.
-
-        Args:
-            X (pd.DataFrame): The variables dataset.
-            y (Any, optional): The predictions dataset. Defaults to None.
-
-        Returns:
-            NaiveDescriptionFiller: The fitted transformer.
-        """
-        return self
-
-    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
-        """
-        Replace missing values of the column `description` with the corresponding value in column `designation`.
-
-        Args:
-            X (pd.DataFrame): The dataframe to transform.
-
-        Returns:
-            pd.DataFrame: A new dataframe without missing values columns.
-        """
-        print(f"\r[NaiveDescriptionFiller] ...", end='')
-        description_cols = [col for col in X.columns if "description" in col]
-        description_cols.remove("description_norm")
-        designation_cols = [col for col in X.columns if "designation" in col]
-        designation_cols.remove("designation_norm")
-        for i in range(len(description_cols)):
-            X.loc[X["description_norm"] == 0, f"description_{i + 1}"] = X.loc[X["description_norm"] == 0, f"designation_{i + 1}"]
-        X = X.drop(columns=['designation_norm', 'description_norm'])
-        print(f"\r[NaiveDescriptionFiller] - DONE")
-        return X
 
 
 class EmbeddingScaler(BaseEstimator, TransformerMixin):
