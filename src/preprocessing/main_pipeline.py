@@ -30,7 +30,7 @@ def pipe() -> None:
 @timer
 def text_pipe() -> None:
     """
-    Execute the text pipeline using the config.json file to set metadata.
+    Execute the text pipeline using metadata from config.json file.
 
     Returns:
         None:
@@ -78,13 +78,7 @@ def text_pipe() -> None:
 @timer
 def image_pipe() -> None:
     """
-    The image datasets pipeline.
-    1. Copier les datasets -> ok
-    2. Pooling -> ok
-    3. Réduction de canaux -> ok
-    4. Sauvegarde -> ok
-
-    Rajout de process facilitée par la structure adaptative.
+    Execute the image pipeline using metadata from config.json file.
     """
 
     return None

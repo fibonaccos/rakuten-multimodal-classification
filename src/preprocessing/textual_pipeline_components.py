@@ -67,7 +67,6 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             CharacterCleaner: The fitted transformer.
         """
-
         return self 
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -196,7 +195,6 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         Returns:
             Vectorizer: The fitted transformer.
         """
-
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -289,7 +287,6 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingExpander: The fitted transformer.
         """
-
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -323,7 +320,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
 
             X_transformed[expanded_cols_names[col]] = X_transformed[expanded_cols_names[col]].astype("float")
 
-        X_transformed = X_transformed.drop(columns=self.cols_to_expand_)
+        X_transformed = X_transformed.drop(columns=self.cols_to_expand_ + ["designation_norm"])
         self.output_shape_ = X_transformed.shape
 
         print(f"\r[EmbeddingExpander] - DONE    ")
@@ -469,7 +466,6 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
         Returns:
             EmbeddingMerger: The fitted transformer.
         """
-
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -487,12 +483,14 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
         designation_cols = [col for col in X_transformed.columns if "designation" in col]
         description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
         new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
-        X_transformed.loc[X_transformed["description_norm"] == 0, description_cols] = X_transformed[X_transformed["description_norm"] == 0, designation_cols]
+        for c1, c2 in zip(designation_cols, description_cols):
+            X_transformed.loc[X_transformed["description_norm"] == 0, c2] = X_transformed.loc[X_transformed["description_norm"] == 0, c1]
         if self.rule_ == "abs":
             for i in range(len(new_cols)):
                 X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)
         else:
-            X_transformed[new_cols] = 0.5 * (X_transformed[designation_cols] + X_transformed[description_cols])
+            to_add = {c3: X_transformed[c1] + X_transformed[c2] for c1, c2, c3 in zip(designation_cols, description_cols, new_cols)}
+            X_transformed = pd.concat([X_transformed, pd.DataFrame(to_add, index=X_transformed.index)], axis=1)
         X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
         return X_transformed
 
