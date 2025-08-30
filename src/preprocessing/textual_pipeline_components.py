@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import Any, Literal
 from sklearn.base import BaseEstimator, TransformerMixin
+from imblearn.base import BaseSampler
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import TomekLinks
 from sklearn.neighbors import KernelDensity
 from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize
@@ -253,7 +256,12 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
 
         if isinstance(text, str):
-            return np.mean(self.model_.encode(self._split_text(text), convert_to_numpy=True), axis=0)
+            chunks = self._split_text(text.strip())
+            encoded_chunks = self.model_.encode(chunks, convert_to_numpy=True)
+            if len(encoded_chunks) > 0:
+                return np.mean(encoded_chunks, axis=0)
+            else:
+                return np.nan
         return text
 
 
@@ -561,3 +569,40 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
         print(f"\r[EmbeddingScaler] - DONE")
         return X_transformed
+
+
+class LabelResampler(BaseSampler):
+    def __init__(self, /) -> None:
+        super().__init__()
+        self.k_neighbors_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["kNeighbors"]
+        self.random_state_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["randomState"]
+        return None
+
+    def _fit_resample(self, /, X: pd.DataFrame, y: pd.DataFrame, **fit_params) -> tuple[pd.DataFrame, pd.DataFrame]:  # type: ignore
+        labels: pd.Series = y["prdtypecode"]
+        n_labels: int = labels.nunique()
+        n_target: int = int(X.shape[0] / n_labels)
+        strategy: dict = {}
+        if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["strategy"] == "equal":
+            for label in labels.unique():
+                if labels.value_counts()[label] < n_target:
+                    strategy[label] = n_target
+        else:
+            strategy = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["strategy"]
+        smote = SMOTE(sampling_strategy=strategy, k_neighbors=self.k_neighbors_, random_state=self.random_state_)  # type: ignore
+        X_os, y_os = smote.fit_resample(X, labels)  # type: ignore
+
+        tomek = TomekLinks()
+        X_res, y_res = tomek.fit_resample(X_os, y_os)  # type: ignore
+
+        X_res["label"] = y_res
+        final_dfs = []
+        for label in labels.unique():
+            label_df = X_res[X_res["label"] == label]
+            if label_df.shape[0] > n_target:
+                label_df = label_df.sample(n=n_target, random_state=self.random_state_)
+            final_dfs.append(label_df)
+        df_final = pd.concat(final_dfs).sample(frac=1, random_state=self.random_state_)
+
+        X_transformed, y_transformed = df_final.drop(columns=["label"]), df_final[["label"]]
+        return X_transformed, y_transformed

@@ -1,10 +1,11 @@
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from typing import Any
-from utils import timer
+from src.utils import timer
 import pandas as pd
 import images_pipeline_components as ipipe
 import textual_pipeline_components as tpipe
+import logging
 
 import sys
 import os
@@ -44,7 +45,10 @@ def text_pipe() -> None:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=PREPROCESSING_CONFIG["PIPELINE"]["trainSize"], random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
+    X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                        stratify=y,
+                                                        train_size=PREPROCESSING_CONFIG["PIPELINE"]["trainSize"],
+                                                        random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
 
     pipeline_steps: list[tuple[str, Any]] = [(step["stepName"], getattr(tpipe, step["transformer"])(**step["params"]))
                                              for step in PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["STEPS"]]

@@ -1,13 +1,13 @@
 {
     "PREPROCESSING": {
         "PATHS": {
-            "rawTextData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/X_train.csv",
-            "rawImageFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/images/",
-            "rawLabels": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/raw/Y_train.csv",
-            "cleanTextTrainData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_train.csv",
-            "cleanTextTestData": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/text_test.csv",
-            "cleanImageTrainFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_train/",
-            "cleanImageTestFolder": "~/fibonaccos/projects/rakuten-multimodal-classification/.data/clean/image_test/"
+            "rawTextData": "~/Projets/rakuten-multimodal-classification/.data/raw/X_train.csv",
+            "rawImageFolder": "~/Projets/rakuten-multimodal-classification/.data/raw/images/",
+            "rawLabels": "~/Projets/rakuten-multimodal-classification/.data/raw/Y_train.csv",
+            "cleanTextTrainData": "~/Projets/rakuten-multimodal-classification/.data/clean/text_train.csv",
+            "cleanTextTestData": "~/Projets/rakuten-multimodal-classification/.data/clean/text_test.csv",
+            "cleanImageTrainFolder": "~/Projets/rakuten-multimodal-classification/.data/clean/image_train/",
+            "cleanImageTestFolder": "~/Projets/rakuten-multimodal-classification/.data/clean/image_test/"
         },
         "CONSTANTS": {
             "textualColumns": ["designation", "description"],
@@ -17,7 +17,7 @@
             "maxTokenVectorizer": 500
         },
         "PIPELINE": {
-            "sampleSize": 5000,
+            "sampleSize": 7500,
             "trainSize": 0.8,
             "randomState": 42,
             "TEXTPIPELINE": {
@@ -25,8 +25,13 @@
                     {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
                     {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
                     {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
-                    {"stepName": "missing_values_imputing", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}}
-                ]
+                    {"stepName": "kde_imputer", "transformer": "LabelKDEImputer", "params": {"random_state": 4}}
+                ],
+                "resampling": {
+                    "strategy": "equal",
+                    "kNeighbors": 3,
+                    "randomState": 5
+                }
             },
             "IMAGEPIPELINE": {
                 "STEPS": [
