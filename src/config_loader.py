@@ -1,25 +1,37 @@
 from pathlib import Path
 from typing import Any
 import json
+from datetime import datetime
 
 
-def find_project_root(filename="config.json") -> Path:
-    current = Path(__file__).resolve()
-    for parent in [current] + list(current.parents):
-        if (parent / filename).is_file():
-            return parent
-    raise FileNotFoundError(f"{filename} non trouvé en remontant depuis {current}")
+_CONFIG = None
+_DATE = None
 
 
-ROOT_DIR = find_project_root()
-CONFIG_PATH = ROOT_DIR / "config.json"
+def _replace_dates(cfg: dict[str, Any]) -> dict[str, Any]:
+    global _DATE
+    if _DATE is None:
+        _DATE = datetime.now().strftime("%y%m%d-%H%M%S")
+    if isinstance(cfg, dict):
+        for clé, valeur in cfg.items():
+            cfg[clé] = _replace_dates(valeur)
+        return cfg
+    elif isinstance(cfg, list):
+        return [_replace_dates(elem) for elem in cfg]
+    elif isinstance(cfg, str):
+        return cfg.replace("{DATE}", _DATE)
+    else:
+        return cfg
 
 
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    _config = json.load(f)
+def get_config(key: str | None = None):
+    global _CONFIG
+    if _CONFIG is None:
+        config_path = Path(__file__).resolve().parent.parent / "config.json"
+        with open(config_path, "r", encoding="utf-8") as f:
+            _CONFIG = json.load(f)
+        _CONFIG = _replace_dates(_CONFIG)
+    if key:
+        return _CONFIG[key]
+    return _CONFIG
 
-
-def get_config(key: str | None = None) -> Any:
-    if key is None:
-        return _config
-    return _config.get(key)

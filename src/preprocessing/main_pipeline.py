@@ -1,21 +1,29 @@
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from typing import Any
-from src.utils import timer
 import pandas as pd
 import images_pipeline_components as ipipe
 import textual_pipeline_components as tpipe
-import logging
 
 import sys
 import os
+import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.config_loader import get_config
+from src.logger import build_logger
+from src.utils import timer
 
 
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")
+LOG_CONFIG = get_config("LOGS")
+
+PIPELOGGER = build_logger(name="pipeline",
+                          filepath=LOG_CONFIG["filePath"],
+                          baseformat=LOG_CONFIG["format"],
+                          dateformat=LOG_CONFIG["dateformat"],
+                          level=logging.INFO)
 
 
 @timer
@@ -24,7 +32,9 @@ def pipe() -> None:
     The main preprocessing pipeline.
     """
 
+    PIPELOGGER.info("pipe > launched")
     text_pipe()
+    PIPELOGGER.info("pipe > finished")
     return None
 
 
@@ -37,7 +47,7 @@ def text_pipe() -> None:
         None:
     """
 
-    print("Reading raw data ...")
+    PIPELOGGER.info("text_pipe > launched")
     if PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"] <= 0:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
@@ -55,27 +65,23 @@ def text_pipe() -> None:
 
     pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
 
-    print("[Text] Pipeline started")
-    print("[Text] Transforming train data ...")
+    PIPELOGGER.info("text_pipe > fit_transform")
     clean_X_train = pipe.fit_transform(X_train, y_train)
 
-    print()
-    print("[Text] Transforming test data ...")
+    PIPELOGGER.info("text_pipe > transform")
     clean_X_test = pipe.transform(X_test)
-
-    print()
-    print("[Text] Pipeline finished")
-    print("[Text] Saving data ...")
 
     clean_train = pd.DataFrame(clean_X_train)
     clean_train = pd.concat([clean_train, y_train], axis=1).rename(columns={'prdtypecode': 'labels'})
     clean_test = pd.DataFrame(clean_X_test)
     clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
+    PIPELOGGER.info("text_pipe > to_csv > train")
     clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False)
+    PIPELOGGER.info("text_pipe > to_csv > test")
     clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False)
 
-    print("Preprocessing done.")
+    PIPELOGGER.info("text_pipe > finished")
     return None
 
 

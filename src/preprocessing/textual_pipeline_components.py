@@ -15,10 +15,12 @@ import nltk
 
 import sys
 import os
+import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.config_loader import get_config
+from src.logger import build_logger
 
 
 __all__ = ["CharacterCleaner",
@@ -26,10 +28,18 @@ __all__ = ["CharacterCleaner",
            "EmbeddingExpander",
            "LabelKDEImputer",
            "EmbeddingMerger",
-           "EmbeddingScaler"]
+           "EmbeddingScaler",
+           "LabelResampler"]
 
 
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")
+LOG_CONFIG = get_config("LOGS")
+TPIPELOGGER = build_logger(name="textual_pipeline_components",
+                           filepath=LOG_CONFIG["filePath"],
+                           baseformat=LOG_CONFIG["baseFormat"],
+                           dateformat=LOG_CONFIG["dateFormat"],
+                           level=logging.INFO)
+
 
 TEXTUAL_COLUMNS: list[str] = PREPROCESSING_CONFIG["CONSTANTS"]["textualColumns"]
 
@@ -89,14 +99,14 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with clean textual columns.
         """
 
+        TPIPELOGGER.info("CharacterCleaner > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
+        for col in TEXTUAL_COLUMNS:
+            TPIPELOGGER.info(f"CharacterCleaner > transform > {col}")
             X_transformed[col] = X_transformed[col].apply(self._clean_html)
             X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
             X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
-
-        print("\r[CharacterCleaner] - DONE    ")
+        TPIPELOGGER.info("CharacterCleaner > transform > OK")
         return X_transformed
 
     def _clean_html(self, /, text: Any) -> Any:
@@ -112,8 +122,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        if isinstance(text, str):
-            return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
+        TPIPELOGGER.info("CharacterCleaner > _clean_html")
+        try:
+            if isinstance(text, str):
+                return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner > _clean_html : {e}")
+            exit(1)
         return text
 
     def _keep_accepted_characters(self, /, text: Any) -> Any:
@@ -129,8 +144,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        if isinstance(text, str):
-            return ''.join(c for c in text if ord(c) in self.accepted_characters_)
+        TPIPELOGGER.info("CharacterCleaner > _keep_accepted_characters")
+        try:
+            if isinstance(text, str):
+                return ''.join(c for c in text if ord(c) in self.accepted_characters_)
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner > _keep_accepted_characters : {e}")
+            exit(1)
         return text
 
     def _clean_text_format(self, /, text: Any) -> Any:
@@ -145,12 +165,17 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        if isinstance(text, str):
-            text = text.replace('\t', ' ')
-            text = re.sub(r'\b[\w.-]+?@\w+?\.\w+?\b', '', text)
-            text = re.sub(r'https?://\S+|www\.\S+', '', text)
-            text = re.sub(r'\s+', ' ', text)
-            text = text.strip()
+        TPIPELOGGER.info(f"CharacterCleaner > _clean_text_format")
+        try:
+            if isinstance(text, str):
+                text = text.replace('\t', ' ')
+                text = re.sub(r'\b[\w.-]+?@\w+?\.\w+?\b', '', text)
+                text = re.sub(r'https?://\S+|www\.\S+', '', text)
+                text = re.sub(r'\s+', ' ', text)
+                text = text.strip()
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner > _clean_text_format : {e}")
+            exit(1)
         return text
 
 
@@ -181,6 +206,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
 
         super().__init__()
+        TPIPELOGGER.info("Vectorizer > nltk > checking punkt downloads")
         nltk.download("punkt")
         nltk.download('punkt_tab')
         self.max_chars_: int = MAX_TOKENS_VECTORIZER
@@ -211,11 +237,12 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with embedded textual columns.
         """
 
+        TPIPELOGGER.info("Vectorizer > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
+        for col in TEXTUAL_COLUMNS:
+            TPIPELOGGER.info(f"Vectorizer > transform > {col}")
             X_transformed[col] = X_transformed[col].apply(self._encoder)
-        print("\r[Vectorizer] - DONE    ")
+        TPIPELOGGER.info("Vectorizer > transform > OK")
         return X_transformed
 
     def _split_text(self, /, text: str) -> list[str]:
@@ -230,17 +257,22 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 subtext.
         """
 
-        sentences: list[str] = sent_tokenize(text, language="french")
-        chunks: list[str] = []
-        current: str = ""
-        for sent in sentences:
-            if len(current) + len(sent) < self.max_chars_:
-                current += " " + sent
-            else:
+        TPIPELOGGER.info("Vectorizer > _split_text")
+        try:
+            sentences: list[str] = sent_tokenize(text, language="french")
+            chunks: list[str] = []
+            current: str = ""
+            for sent in sentences:
+                if len(current) + len(sent) < self.max_chars_:
+                    current += " " + sent
+                else:
+                    chunks.append(current.strip())
+                    current = sent
+            if current:
                 chunks.append(current.strip())
-                current = sent
-        if current:
-            chunks.append(current.strip())
+        except Exception as e:
+            TPIPELOGGER.error(f"Vectorizer > _split_text : {e}")
+            exit(1)
         return chunks
 
     def _encoder(self, /, text: Any) -> Any:
@@ -255,13 +287,18 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 the `text` unchanged.
         """
 
-        if isinstance(text, str):
-            chunks = self._split_text(text.strip())
-            encoded_chunks = self.model_.encode(chunks, convert_to_numpy=True)
-            if len(encoded_chunks) > 0:
-                return np.mean(encoded_chunks, axis=0)
-            else:
-                return np.nan
+        TPIPELOGGER.info("Vectorizer > _encoder")
+        try:
+            if isinstance(text, str):
+                chunks = self._split_text(text.strip())
+                encoded_chunks = self.model_.encode(chunks, convert_to_numpy=True)
+                if len(encoded_chunks) > 0:
+                    return np.mean(encoded_chunks, axis=0)
+                else:
+                    return np.nan
+        except Exception as e:
+            TPIPELOGGER.error(f"Vectorizer > _encoder : {e}")
+            exit(1)
         return text
 
 
@@ -310,11 +347,11 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with expanded columns.
         """
 
+        TPIPELOGGER.info("EmbeddingExpander > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
         expanded_cols_names: dict[str, list[str]] = {col: [] for col in TEXTUAL_COLUMNS}
-        for i, col in enumerate(self.cols_to_expand_):
-            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)}", end='')
-
+        for col in self.cols_to_expand_:
+            TPIPELOGGER.info(f"EmbeddingExpander > transform > {col}")
             expand_size = len(X_transformed[~X_transformed[col].isna()].reset_index()[col][0])
             X_transformed[col] = X_transformed[col].fillna(str(np.zeros(expand_size)))
             X_transformed[col] = X_transformed[col].apply(self._make_array_like)
@@ -331,7 +368,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         X_transformed = X_transformed.drop(columns=self.cols_to_expand_ + ["designation_norm"])
         self.output_shape_ = X_transformed.shape
 
-        print(f"\r[EmbeddingExpander] - DONE    ")
+        TPIPELOGGER.info("EmbeddingExpander > transform > OK")
         return X_transformed
 
     def _make_array_like(self, /, encoded_text: Any) -> Any:
@@ -346,10 +383,15 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             Any: Cleaned value ready for expanding or `NaN`.
         """
 
-        if isinstance(encoded_text, str):
-            s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
-            s = [v for v in s if v != '']
-            return s
+        TPIPELOGGER.info("EmbeddingExpander > _make_array_like")
+        try:
+            if isinstance(encoded_text, str):
+                s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
+                s = [v for v in s if v != '']
+                return s
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingExpander > _make_array_like : {e}")
+            exit(1)
         return encoded_text
 
 
@@ -393,26 +435,30 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
             LabelKDEImputer: The fitted transformer.
         """
 
-        print("[LabelKDEImputer] - Fitting ...", end='')
-        self.missing_values_mask_ = X["description_norm"] == 0
-        self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
-        self.labels_ = y["prdtypecode"].unique().tolist()
-        Xx: pd.DataFrame = X[self.cols_].copy(deep=True)
-        Xx.loc[self.missing_values_mask_] = np.nan
-        for k in self.labels_:
-            k_indices = y["prdtypecode"] == k
-            self.labels_indices_[k] = k_indices
-            Xk = Xx.loc[k_indices].dropna()
-            mk, sk = Xk.mean(axis=0), Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
-            self.labels_stats_[k] = (mk, sk)
-            Xk = (Xk - mk) / sk
-            for col in self.cols_:
-                x = Xk[col].to_numpy()
-                kde = KernelDensity(kernel="gaussian")
-                kde.fit(x.reshape(1, -1))
-                self.kdes_[(k, col)] = kde
-        print("\r[LabelKDEImputer] - Fitting done.")
-        return self
+        try:
+            TPIPELOGGER.info("LabelKDEImputer > fit")
+            self.missing_values_mask_ = X["description_norm"] == 0
+            self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
+            self.labels_ = y["prdtypecode"].unique().tolist()
+            Xx: pd.DataFrame = X[self.cols_].copy(deep=True)
+            Xx.loc[self.missing_values_mask_] = np.nan
+            for k in self.labels_:
+                k_indices = y["prdtypecode"] == k
+                self.labels_indices_[k] = k_indices
+                Xk = Xx.loc[k_indices].dropna()
+                mk, sk = Xk.mean(axis=0), Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
+                self.labels_stats_[k] = (mk, sk)
+                Xk = (Xk - mk) / sk
+                for col in self.cols_:
+                    x = Xk[col].to_numpy()
+                    kde = KernelDensity(kernel="gaussian")
+                    kde.fit(x.reshape(1, -1))
+                    self.kdes_[(k, col)] = kde
+            TPIPELOGGER.info("LabelKDEImputer > fit > OK")
+            return self
+        except Exception as e:
+            TPIPELOGGER.error(f"LabelKDEImputer > fit : {e}")
+            exit(1)
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
@@ -425,19 +471,22 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
             pd.DataFrame: The dataframe without missing values.
         """
 
-        print("[LabelKDEImputer] - Transforming ...", end='')
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        X_transformed.loc[self.missing_values_mask_, self.cols_] = np.nan
-        for k in self.labels_:
-            Xk = X_transformed.copy(deep=True).astype("float").loc[self.labels_indices_[k], self.cols_]
-            Xk = (Xk - self.labels_stats_[k][0]) / self.labels_stats_[k][1]
-            for col in self.cols_:
-                nan_mask = Xk[col].isna()
-                Xk.loc[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=len(nan_mask.to_list()), random_state=self.random_state_)
-            X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
-        print("\r[LabelKDEImputer] - Transforming done.")
-        print("[LabelKDEImputer] - DONE")
-        return X_transformed
+        TPIPELOGGER.info("LabelKDEImputer > transform")
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            X_transformed.loc[self.missing_values_mask_, self.cols_] = np.nan
+            for k in self.labels_:
+                Xk = X_transformed.copy(deep=True).astype("float").loc[self.labels_indices_[k], self.cols_]
+                Xk = (Xk - self.labels_stats_[k][0]) / self.labels_stats_[k][1]
+                for col in self.cols_:
+                    nan_mask = Xk[col].isna()
+                    Xk.loc[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=len(nan_mask.to_list()), random_state=self.random_state_)
+                X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
+            TPIPELOGGER.info("LabelKDEImputer > transform > OK")
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"LabelKDEImputer > transform : {e}")
+            exit(1)
 
 
 class EmbeddingMerger(BaseEstimator, TransformerMixin):
@@ -487,20 +536,26 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
             pd.DataFrame: The reduces dataframe withou missing values.
         """
 
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        designation_cols = [col for col in X_transformed.columns if "designation" in col]
-        description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
-        new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
-        for c1, c2 in zip(designation_cols, description_cols):
-            X_transformed.loc[X_transformed["description_norm"] == 0, c2] = X_transformed.loc[X_transformed["description_norm"] == 0, c1]
-        if self.rule_ == "abs":
-            for i in range(len(new_cols)):
-                X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)
-        else:
-            to_add = {c3: X_transformed[c1] + X_transformed[c2] for c1, c2, c3 in zip(designation_cols, description_cols, new_cols)}
-            X_transformed = pd.concat([X_transformed, pd.DataFrame(to_add, index=X_transformed.index)], axis=1)
-        X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
-        return X_transformed
+        TPIPELOGGER.info("EmbeddingMerger > transform")
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            designation_cols = [col for col in X_transformed.columns if "designation" in col]
+            description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
+            new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
+            for c1, c2 in zip(designation_cols, description_cols):
+                X_transformed.loc[X_transformed["description_norm"] == 0, c2] = X_transformed.loc[X_transformed["description_norm"] == 0, c1]
+            if self.rule_ == "abs":
+                for i in range(len(new_cols)):
+                    X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)
+            else:
+                to_add = {c3: X_transformed[c1] + X_transformed[c2] for c1, c2, c3 in zip(designation_cols, description_cols, new_cols)}
+                X_transformed = pd.concat([X_transformed, pd.DataFrame(to_add, index=X_transformed.index)], axis=1)
+            X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
+            TPIPELOGGER.info("EmbeddingMerger > transform > OK")
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingMerger > transform : {e}")
+            exit(1)
 
 
 class EmbeddingScaler(BaseEstimator, TransformerMixin):
@@ -564,45 +619,55 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
             pd.DataFrame: The scaled dataframe.
         """
 
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        print(f"\r[EmbeddingScaler] ...", end='')
-        X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
-        print(f"\r[EmbeddingScaler] - DONE")
-        return X_transformed
+        TPIPELOGGER.info("EmbeddingScaler > transform")
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
+            TPIPELOGGER.info("EmbeddingScaler > transform > OK")
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingScaler > transform : {e}")
+            exit(1)
 
 
 class LabelResampler(BaseSampler):
     def __init__(self, /) -> None:
         super().__init__()
-        self.k_neighbors_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["kNeighbors"]
-        self.random_state_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["randomState"]
+        self.k_neighbors_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["kNeighbors"]
+        self.random_state_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["randomState"]
         return None
 
     def _fit_resample(self, /, X: pd.DataFrame, y: pd.DataFrame, **fit_params) -> tuple[pd.DataFrame, pd.DataFrame]:  # type: ignore
-        labels: pd.Series = y["prdtypecode"]
-        n_labels: int = labels.nunique()
-        n_target: int = int(X.shape[0] / n_labels)
-        strategy: dict = {}
-        if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["strategy"] == "equal":
+        TPIPELOGGER.info("LabelResampler > _fit_resample")
+        try:
+            labels: pd.Series = y["prdtypecode"]
+            n_labels: int = labels.nunique()
+            n_target: int = int(X.shape[0] / n_labels)
+            strategy: dict = {}
+            if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["strategy"] == "equal":
+                for label in labels.unique():
+                    if labels.value_counts()[label] < n_target:
+                        strategy[label] = n_target
+            else:
+                strategy = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["strategy"]
+            smote = SMOTE(sampling_strategy=strategy, k_neighbors=self.k_neighbors_, random_state=self.random_state_)  # type: ignore
+            X_os, y_os = smote.fit_resample(X, labels)  # type: ignore
+
+            tomek = TomekLinks()
+            X_res, y_res = tomek.fit_resample(X_os, y_os)  # type: ignore
+
+            X_res["label"] = y_res
+            final_dfs = []
             for label in labels.unique():
-                if labels.value_counts()[label] < n_target:
-                    strategy[label] = n_target
-        else:
-            strategy = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["resampling"]["strategy"]
-        smote = SMOTE(sampling_strategy=strategy, k_neighbors=self.k_neighbors_, random_state=self.random_state_)  # type: ignore
-        X_os, y_os = smote.fit_resample(X, labels)  # type: ignore
+                label_df = X_res[X_res["label"] == label]
+                if label_df.shape[0] > n_target:
+                    label_df = label_df.sample(n=n_target, random_state=self.random_state_)
+                final_dfs.append(label_df)
+            df_final = pd.concat(final_dfs).sample(frac=1, random_state=self.random_state_)
 
-        tomek = TomekLinks()
-        X_res, y_res = tomek.fit_resample(X_os, y_os)  # type: ignore
-
-        X_res["label"] = y_res
-        final_dfs = []
-        for label in labels.unique():
-            label_df = X_res[X_res["label"] == label]
-            if label_df.shape[0] > n_target:
-                label_df = label_df.sample(n=n_target, random_state=self.random_state_)
-            final_dfs.append(label_df)
-        df_final = pd.concat(final_dfs).sample(frac=1, random_state=self.random_state_)
-
-        X_transformed, y_transformed = df_final.drop(columns=["label"]), df_final[["label"]]
-        return X_transformed, y_transformed
+            X_transformed, y_transformed = df_final.drop(columns=["label"]), df_final[["label"]]
+            TPIPELOGGER.info("LabelResampler > _fit_resample > OK")
+            return X_transformed, y_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingScaler > _fit_resample : {e}")
+            exit(1)

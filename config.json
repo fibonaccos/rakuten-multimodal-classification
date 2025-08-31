@@ -17,7 +17,7 @@
             "maxTokenVectorizer": 500
         },
         "PIPELINE": {
-            "sampleSize": 7500,
+            "sampleSize": 500,
             "trainSize": 0.8,
             "randomState": 42,
             "TEXTPIPELINE": {
@@ -25,12 +25,17 @@
                     {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
                     {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
                     {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
-                    {"stepName": "kde_imputer", "transformer": "LabelKDEImputer", "params": {"random_state": 4}}
+                    {"stepName": "embedding_merge", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}},
+                    {"stepName": "scaling", "transformer": "EmbeddingScaler",
+                        "params": {"scaling": "normal", "excluded_cols": ["productid", "imageid", "description_norm"]}}
                 ],
-                "resampling": {
-                    "strategy": "equal",
-                    "kNeighbors": 3,
-                    "randomState": 5
+                "RESAMPLING": {
+                    "active": 1,
+                    "params": {
+                        "strategy": "equal",
+                        "kNeighbors": 3,
+                        "randomState": 5
+                    }
                 }
             },
             "IMAGEPIPELINE": {
@@ -46,5 +51,10 @@
                 ]
             }
         }
+    },
+    "LOGS": {
+        "filePath": "~/Projets/rakuten-multimodal-classification/.logs/{DATE}_",
+        "baseFormat": "%(asctime)s [%(levelname)s] %(message)s",
+        "dateFormat": "%Y-%m-%d %H:%M:%S"
     }
 }
