@@ -1,36 +1,36 @@
 {
     "PREPROCESSING": {
         "PATHS": {
-            "rawTextData": "~/Projets/rakuten-multimodal-classification/.data/raw/X_train.csv",
-            "rawImageFolder": "~/Projets/rakuten-multimodal-classification/.data/raw/images/",
-            "rawLabels": "~/Projets/rakuten-multimodal-classification/.data/raw/Y_train.csv",
-            "cleanTextTrainData": "~/Projets/rakuten-multimodal-classification/.data/clean/text_train.csv",
-            "cleanTextTestData": "~/Projets/rakuten-multimodal-classification/.data/clean/text_test.csv",
-            "cleanImageTrainFolder": "~/Projets/rakuten-multimodal-classification/.data/clean/image_train/",
-            "cleanImageTestFolder": "~/Projets/rakuten-multimodal-classification/.data/clean/image_test/"
-        },
-        "CONSTANTS": {
-            "textualColumns": ["designation", "description"],
-            "alphanumCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-            "ponctuationCharacters": "!\"$%&'()+,-./\\:;?[]^_`|~",
-            "accentCharacters": "àâäçéèêëîïôöùûüÿœæ",
-            "maxTokenVectorizer": 500
+            "rawTextData": ".data/raw/X_train.csv",
+            "rawImageFolder": ".data/raw/images/",
+            "rawLabels": ".data/raw/Y_train.csv",
+            "cleanTextTrainData": ".data/clean/text_train.csv",
+            "cleanTextTestData": ".data/clean/text_test.csv",
+            "cleanImageTrainFolder": ".data/clean/image_train/",
+            "cleanImageTestFolder": ".data/clean/image_test/"
         },
         "PIPELINE": {
-            "sampleSize": 500,
-            "trainSize": 0.8,
+            "sampleSize": 5000,
+            "trainSize": 0.7,
             "randomState": 42,
             "TEXTPIPELINE": {
+                "CONSTANTS": {
+                    "textualColumns": ["designation", "description"],
+                    "alphanumCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                    "ponctuationCharacters": "!\"$%&'()+,-./\\:;?[]^_`|~",
+                    "accentCharacters": "àâäçéèêëîïôöùûüÿœæ",
+                    "maxTokenVectorizer": 500
+                },
                 "STEPS": [
                     {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
                     {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
                     {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
-                    {"stepName": "embedding_merge", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}},
+                    {"stepName": "embedding_merging", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}},
                     {"stepName": "scaling", "transformer": "EmbeddingScaler",
                         "params": {"scaling": "normal", "excluded_cols": ["productid", "imageid", "description_norm"]}}
                 ],
                 "RESAMPLING": {
-                    "active": 1,
+                    "active": false,
                     "params": {
                         "strategy": "equal",
                         "kNeighbors": 5,
@@ -39,15 +39,19 @@
                 }
             },
             "IMAGEPIPELINE": {
+                "CONSTANTS" : {
+                    "imageShape": [500, 500, 3]
+                },
                 "STEPS": [
-                    {"stepName": "rotation", "transformer": "RotationTransformer", "params": {}},
-                    {"stepName": "symmetry", "transformer": "SymmetryTransformer", "params": {}},
-                    {"stepName": "zoom", "transformer": "ZoomTransformer", "params": {}},
-                    {"stepName": "blur", "transformer": "BlurTransformer", "params": {}},
-                    {"stepName": "coloration", "transformer": "ColorTransformer", "params": {}},
-                    {"stepName": "crop", "transformer": "CropTransformer", "params": {}},
-                    {"stepName": "noise", "transformer": "NoiseTransformer", "params": {}},
-                    {"stepName": "gap", "transformer": "GapTransformer", "params": {}}
+                    {"stepName": "rotation", "transformer": "RandomImageRotation", "params": {"degree": 180, "p": 0.5}},
+                    {"stepName": "flip", "transformer": "RandomImageFlip", "params": {"horizontal": true, "vertical": true, "p": 0.5}},
+                    {"stepName": "crop", "transformer": "RandomImageCrop", "params": {"p": 0.5}},
+                    {"stepName": "zoom", "transformer": "RandomImageZoom", "params": {"factor": 0.3, "p": 0.5}},
+                    {"stepName": "blur", "transformer": "RandomImageBlur", "params": {"p": 0.5}},
+                    {"stepName": "noise", "transformer": "RandomImageNoise", "params": {"std": 1, "p": 0.5}},
+                    {"stepName": "contrast", "transformer": "RandomImageContrast", "params": {"p": 0.5}},
+                    {"stepName": "coloration", "transformer": "RandomImageColoration", "params": {"p": 0.5}},
+                    {"stepName": "dropout", "transformer": "RandomImageDropout", "params": {"p": 0.5}}
                 ]
             }
         }

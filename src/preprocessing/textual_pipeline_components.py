@@ -32,7 +32,7 @@ __all__ = ["CharacterCleaner",
            "LabelResampler"]
 
 
-PREPROCESSING_CONFIG = get_config("PREPROCESSING")
+PREPROCESSING_CONFIG = get_config("PREPROCESSING")["PIPELINE"]["TEXTPIPELINE"]
 LOG_CONFIG = get_config("LOGS")
 TPIPELOGGER = build_logger(name="textual_pipeline_components",
                            filepath=LOG_CONFIG["filePath"],
@@ -411,7 +411,7 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         self.cols_: list[str] = []
         self.labels_: list[int] = []
         self.labels_indices_: dict[int, pd.Series[bool]] = {}
-        self.labels_stats_: dict[int, tuple[pd.Series, pd.Series]] = {}
+        self.labels_stats_: dict[int, tuple[pd.Series[float], pd.Series[float]]] = {}
         self.kdes_: dict[tuple[int, str], KernelDensity] = {}
         self.random_state_: int = random_state
         self.is_fitted: bool = False
@@ -429,29 +429,35 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
             LabelKDEImputer: The fitted transformer.
         """
 
-        try:
-            TPIPELOGGER.info(f"LabelKDEImputer : fitting  ({"train" if not self.is_fitted else "test"} data)")
-            self.missing_values_mask_ = X["description_norm"] == 0
-            self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
-            self.labels_ = y["prdtypecode"].unique().tolist()
-            Xx: pd.DataFrame = X[self.cols_].copy(deep=True)
-            Xx.loc[self.missing_values_mask_] = np.nan
-            for k in self.labels_:
-                k_indices = y["prdtypecode"] == k
-                self.labels_indices_[k] = k_indices
-                Xk = Xx.loc[k_indices].dropna()
-                mk, sk = Xk.mean(axis=0), Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
-                self.labels_stats_[k] = (mk, sk)
-                Xk = (Xk - mk) / sk
-                for col in self.cols_:
-                    x = Xk[col].to_numpy()
-                    kde = KernelDensity(kernel="gaussian")
-                    kde.fit(x.reshape(1, -1))
-                    self.kdes_[(k, col)] = kde
-            return self
-        except Exception as e:
-            TPIPELOGGER.error(f"LabelKDEImputer : fit - {e}")
-            exit(1)
+        #try:
+        TPIPELOGGER.info(f"LabelKDEImputer : fitting ({"train" if not self.is_fitted else "test"} data)")
+        self.missing_values_mask_ = X["description_norm"] == 0
+        self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
+        self.labels_ = y["prdtypecode"].unique().tolist()
+        Xx: pd.DataFrame = X[self.cols_].copy(deep=True)
+        Xx.loc[self.missing_values_mask_] = np.nan
+        for k in self.labels_:
+            k_indices = y["prdtypecode"] == k
+            self.labels_indices_[k] = k_indices
+            Xk = Xx.loc[k_indices].dropna()
+            if Xk.empty:
+                continue
+            mk: pd.Series[float] = Xk.mean(axis=0)
+            if Xk.shape[0] < 2:
+                sk = pd.Series([1e-6 for _ in range(Xk.shape[1])], index=Xk.columns)
+            else:
+                sk = Xk.std(axis=0, ddof=1).apply(lambda x: max(x, 1e-6))
+            self.labels_stats_[k] = (mk, sk)
+            for col in self.cols_:
+                x = Xk[col].to_numpy()
+                x = (x - mk[col]) / sk[col]
+                kde = KernelDensity(kernel="gaussian")
+                kde.fit(x.reshape((Xk.shape[0], 1)))
+                self.kdes_[(k, col)] = kde
+        return self
+        #except Exception as e:
+        #    TPIPELOGGER.error(f"LabelKDEImputer : fit - {e}")
+        #    exit(1)
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
@@ -467,19 +473,33 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         TPIPELOGGER.info(f"LabelKDEImputer : imputing missing values ({"train" if not self.is_fitted else "test"} data)")
         try:
             X_transformed: pd.DataFrame = X.copy(deep=True)
+            if self.is_fitted:
+                return self._test_transform(X_transformed)
             X_transformed.loc[self.missing_values_mask_, self.cols_] = np.nan
             for k in self.labels_:
                 Xk = X_transformed.copy(deep=True).astype("float").loc[self.labels_indices_[k], self.cols_]
-                Xk = (Xk - self.labels_stats_[k][0]) / self.labels_stats_[k][1]
+                nan_mask = Xk.isna()
+                Xk.loc[~nan_mask[self.cols_[0]]] = (Xk.loc[~nan_mask[self.cols_[0]]].to_numpy() - self.labels_stats_[k][0].to_numpy()) / self.labels_stats_[k][1].to_numpy()
+                if nan_mask.sum().sum() == 0:
+                    continue
                 for col in self.cols_:
-                    nan_mask = Xk[col].isna()
-                    Xk.loc[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=len(nan_mask.to_list()), random_state=self.random_state_)
-                X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
+                    Xk.loc[nan_mask[col], col] = self.kdes_[(k, col)].sample(n_samples=nan_mask[col].sum(), random_state=self.random_state_).flatten()
+                mk = np.tile(self.labels_stats_[k][0], (self.labels_indices_[k].sum(), 1))
+                sk = np.tile(self.labels_stats_[k][1], (self.labels_indices_[k].sum(), 1))
+                X_transformed.loc[self.labels_indices_[k], self.cols_] = mk + sk * Xk.to_numpy()
             self.is_fitted = True
             return X_transformed
         except Exception as e:
             TPIPELOGGER.error(f"LabelKDEImputer : transform - {e}")
             exit(1)
+
+    def _test_transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
+        X_transformed: pd.DataFrame = X.copy(deep=True)
+        missing_mask = X["description_norm"] == 0
+        X_transformed.loc[missing_mask, self.cols_] = np.nan
+        for k in self.labels_:
+            pass
+        return X_transformed
 
 
 class EmbeddingMerger(BaseEstimator, TransformerMixin):
@@ -628,8 +648,8 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
 class LabelResampler(BaseSampler):
     def __init__(self, /) -> None:
         super().__init__()
-        self.k_neighbors_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["kNeighbors"]
-        self.random_state_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["randomState"]
+        self.k_neighbors_: int = PREPROCESSING_CONFIG["RESAMPLING"]["params"]["kNeighbors"]
+        self.random_state_: int = PREPROCESSING_CONFIG["RESAMPLING"]["params"]["randomState"]
         self.is_fitted: bool = False
         return None
 
@@ -640,12 +660,13 @@ class LabelResampler(BaseSampler):
             n_labels: int = labels.nunique()
             n_target: int = int(X.shape[0] / n_labels)
             strategy: dict = {}
-            if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["strategy"] == "equal":
+            if PREPROCESSING_CONFIG["RESAMPLING"]["params"]["strategy"] == "equal":
                 for label in labels.unique():
                     if labels.value_counts()[label] < n_target:
                         strategy[label] = n_target
             else:
-                strategy = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["strategy"]
+                strategy = PREPROCESSING_CONFIG["RESAMPLING"]["params"]["strategy"]
+
             smote = SMOTE(sampling_strategy=strategy, k_neighbors=self.k_neighbors_, random_state=self.random_state_)  # type: ignore
             X_os, y_os = smote.fit_resample(X, labels)  # type: ignore
 

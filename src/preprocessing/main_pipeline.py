@@ -1,8 +1,10 @@
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import TomekLinks
 from typing import Any
 import pandas as pd
-import images_pipeline_components as ipipe
+#import images_pipeline_components as ipipe
 import textual_pipeline_components as tpipe
 
 import sys
@@ -29,7 +31,7 @@ PIPELOGGER = build_logger(name="pipeline",
 @timer
 def pipe() -> None:
     """
-    The main preprocessing pipeline.
+    The main preprocessing pipeline. It uses the metadata from the config.json file
     """
 
     PIPELOGGER.info("pipe : started")
@@ -41,7 +43,7 @@ def pipe() -> None:
 @timer
 def text_pipe() -> None:
     """
-    Execute the text pipeline using metadata from config.json file.
+    Execute the text preprocessing pipeline using metadata from config.json file.
 
     Returns:
         None:
@@ -72,6 +74,10 @@ def text_pipe() -> None:
     PIPELOGGER.info("text_pipe : processing test data")
     clean_X_test = pipe.transform(X_test)
 
+    if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["active"]:
+        PIPELOGGER.info("text_pipe : resampling train data")
+        clean_X_train, y_train = tpipe.LabelResampler().fit_resample(pd.DataFrame(clean_X_train), pd.DataFrame(y_train))  # type: ignore
+
     clean_train = pd.DataFrame(clean_X_train)
     clean_train = pd.concat([clean_train, y_train], axis=1).rename(columns={'prdtypecode': 'labels'})
     clean_test = pd.DataFrame(clean_X_test)
@@ -89,7 +95,7 @@ def text_pipe() -> None:
 @timer
 def image_pipe() -> None:
     """
-    Execute the image pipeline using metadata from config.json file.
+    Execute the image preprocessing pipeline using metadata from config.json file.
     """
 
     return None
