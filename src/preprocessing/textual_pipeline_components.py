@@ -66,6 +66,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         """
 
         super().__init__()
+        self.is_fitted: bool = False
         self.accepted_characters_: list[int] = ACCEPTED_CHARACTERS
         return None
 
@@ -99,14 +100,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with clean textual columns.
         """
 
-        TPIPELOGGER.info("CharacterCleaner > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for col in TEXTUAL_COLUMNS:
-            TPIPELOGGER.info(f"CharacterCleaner > transform > {col}")
+            TPIPELOGGER.info(f"CharacterCleaner : cleaning {col} ({"train" if not self.is_fitted else "test"} data)")
             X_transformed[col] = X_transformed[col].apply(self._clean_html)
             X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
             X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
-        TPIPELOGGER.info("CharacterCleaner > transform > OK")
+        self.is_fitted = True
         return X_transformed
 
     def _clean_html(self, /, text: Any) -> Any:
@@ -122,12 +122,11 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        TPIPELOGGER.info("CharacterCleaner > _clean_html")
         try:
             if isinstance(text, str):
                 return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
         except Exception as e:
-            TPIPELOGGER.error(f"CharacterCleaner > _clean_html : {e}")
+            TPIPELOGGER.error(f"CharacterCleaner : _clean_html - {e}")
             exit(1)
         return text
 
@@ -144,12 +143,11 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        TPIPELOGGER.info("CharacterCleaner > _keep_accepted_characters")
         try:
             if isinstance(text, str):
                 return ''.join(c for c in text if ord(c) in self.accepted_characters_)
         except Exception as e:
-            TPIPELOGGER.error(f"CharacterCleaner > _keep_accepted_characters : {e}")
+            TPIPELOGGER.error(f"CharacterCleaner : _keep_accepted_characters - {e}")
             exit(1)
         return text
 
@@ -165,7 +163,6 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
             str: The cleaned text.
         """
 
-        TPIPELOGGER.info(f"CharacterCleaner > _clean_text_format")
         try:
             if isinstance(text, str):
                 text = text.replace('\t', ' ')
@@ -174,7 +171,7 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
                 text = re.sub(r'\s+', ' ', text)
                 text = text.strip()
         except Exception as e:
-            TPIPELOGGER.error(f"CharacterCleaner > _clean_text_format : {e}")
+            TPIPELOGGER.error(f"CharacterCleaner : _clean_text_format - {e}")
             exit(1)
         return text
 
@@ -206,11 +203,12 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         """
 
         super().__init__()
-        TPIPELOGGER.info("Vectorizer > nltk > checking punkt downloads")
+        TPIPELOGGER.info("Vectorizer : checking punkt downloads from nltk")
         nltk.download("punkt")
         nltk.download('punkt_tab')
         self.max_chars_: int = MAX_TOKENS_VECTORIZER
         self.model_: SentenceTransformer = SentenceTransformer(model)
+        self.is_fitted: bool = False
         return None
 
     def fit(self, /, X: pd.DataFrame, y: Any = None) -> Vectorizer:
@@ -237,12 +235,11 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with embedded textual columns.
         """
 
-        TPIPELOGGER.info("Vectorizer > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
         for col in TEXTUAL_COLUMNS:
-            TPIPELOGGER.info(f"Vectorizer > transform > {col}")
+            TPIPELOGGER.info(f"Vectorizer : encoding {col}  ({"train" if not self.is_fitted else "test"} data)")
             X_transformed[col] = X_transformed[col].apply(self._encoder)
-        TPIPELOGGER.info("Vectorizer > transform > OK")
+        self.is_fitted = True
         return X_transformed
 
     def _split_text(self, /, text: str) -> list[str]:
@@ -257,7 +254,6 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 subtext.
         """
 
-        TPIPELOGGER.info("Vectorizer > _split_text")
         try:
             sentences: list[str] = sent_tokenize(text, language="french")
             chunks: list[str] = []
@@ -271,7 +267,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             if current:
                 chunks.append(current.strip())
         except Exception as e:
-            TPIPELOGGER.error(f"Vectorizer > _split_text : {e}")
+            TPIPELOGGER.error(f"Vectorizer : _split_text - {e}")
             exit(1)
         return chunks
 
@@ -287,7 +283,6 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 the `text` unchanged.
         """
 
-        TPIPELOGGER.info("Vectorizer > _encoder")
         try:
             if isinstance(text, str):
                 chunks = self._split_text(text.strip())
@@ -297,7 +292,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 else:
                     return np.nan
         except Exception as e:
-            TPIPELOGGER.error(f"Vectorizer > _encoder : {e}")
+            TPIPELOGGER.error(f"Vectorizer : _encoder - {e}")
             exit(1)
         return text
 
@@ -319,6 +314,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
         super().__init__()
         self.cols_to_expand_: list[str] = TEXTUAL_COLUMNS
         self.output_shape_: tuple[int, int] = (0, 0)
+        self.is_fitted: bool = False
         return None
 
     def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingExpander:
@@ -347,11 +343,10 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with expanded columns.
         """
 
-        TPIPELOGGER.info("EmbeddingExpander > transform")
         X_transformed: pd.DataFrame = X.copy(deep=True)
         expanded_cols_names: dict[str, list[str]] = {col: [] for col in TEXTUAL_COLUMNS}
         for col in self.cols_to_expand_:
-            TPIPELOGGER.info(f"EmbeddingExpander > transform > {col}")
+            TPIPELOGGER.info(f"EmbeddingExpander : expanding {col}  ({"train" if not self.is_fitted else "test"} data)")
             expand_size = len(X_transformed[~X_transformed[col].isna()].reset_index()[col][0])
             X_transformed[col] = X_transformed[col].fillna(str(np.zeros(expand_size)))
             X_transformed[col] = X_transformed[col].apply(self._make_array_like)
@@ -367,8 +362,7 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
 
         X_transformed = X_transformed.drop(columns=self.cols_to_expand_ + ["designation_norm"])
         self.output_shape_ = X_transformed.shape
-
-        TPIPELOGGER.info("EmbeddingExpander > transform > OK")
+        self.is_fitted = True
         return X_transformed
 
     def _make_array_like(self, /, encoded_text: Any) -> Any:
@@ -383,14 +377,13 @@ class EmbeddingExpander(BaseEstimator, TransformerMixin):
             Any: Cleaned value ready for expanding or `NaN`.
         """
 
-        TPIPELOGGER.info("EmbeddingExpander > _make_array_like")
         try:
             if isinstance(encoded_text, str):
                 s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
                 s = [v for v in s if v != '']
                 return s
         except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingExpander > _make_array_like : {e}")
+            TPIPELOGGER.error(f"EmbeddingExpander : _make_array_like - {e}")
             exit(1)
         return encoded_text
 
@@ -421,6 +414,7 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         self.labels_stats_: dict[int, tuple[pd.Series, pd.Series]] = {}
         self.kdes_: dict[tuple[int, str], KernelDensity] = {}
         self.random_state_: int = random_state
+        self.is_fitted: bool = False
         return None
 
     def fit(self, /, X: pd.DataFrame, y: pd.DataFrame) -> LabelKDEImputer:
@@ -436,7 +430,7 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
         """
 
         try:
-            TPIPELOGGER.info("LabelKDEImputer > fit")
+            TPIPELOGGER.info(f"LabelKDEImputer : fitting  ({"train" if not self.is_fitted else "test"} data)")
             self.missing_values_mask_ = X["description_norm"] == 0
             self.cols_ = [col for col in X.drop(columns=["description_norm"]).columns if "description" in col]
             self.labels_ = y["prdtypecode"].unique().tolist()
@@ -454,10 +448,9 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
                     kde = KernelDensity(kernel="gaussian")
                     kde.fit(x.reshape(1, -1))
                     self.kdes_[(k, col)] = kde
-            TPIPELOGGER.info("LabelKDEImputer > fit > OK")
             return self
         except Exception as e:
-            TPIPELOGGER.error(f"LabelKDEImputer > fit : {e}")
+            TPIPELOGGER.error(f"LabelKDEImputer : fit - {e}")
             exit(1)
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -471,7 +464,7 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
             pd.DataFrame: The dataframe without missing values.
         """
 
-        TPIPELOGGER.info("LabelKDEImputer > transform")
+        TPIPELOGGER.info(f"LabelKDEImputer : imputing missing values ({"train" if not self.is_fitted else "test"} data)")
         try:
             X_transformed: pd.DataFrame = X.copy(deep=True)
             X_transformed.loc[self.missing_values_mask_, self.cols_] = np.nan
@@ -482,10 +475,10 @@ class LabelKDEImputer(BaseEstimator, TransformerMixin):
                     nan_mask = Xk[col].isna()
                     Xk.loc[nan_mask, col] = self.kdes_[(k, col)].sample(n_samples=len(nan_mask.to_list()), random_state=self.random_state_)
                 X_transformed[self.labels_indices_[k]] = self.labels_stats_[k][0] + self.labels_stats_[k][1] * Xk
-            TPIPELOGGER.info("LabelKDEImputer > transform > OK")
+            self.is_fitted = True
             return X_transformed
         except Exception as e:
-            TPIPELOGGER.error(f"LabelKDEImputer > transform : {e}")
+            TPIPELOGGER.error(f"LabelKDEImputer : transform - {e}")
             exit(1)
 
 
@@ -510,6 +503,7 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
 
         super().__init__()
         self.rule_: Literal["mean", "abs"] = rule
+        self.is_fitted: bool = False
         return None
 
     def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingMerger:
@@ -536,7 +530,7 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
             pd.DataFrame: The reduces dataframe withou missing values.
         """
 
-        TPIPELOGGER.info("EmbeddingMerger > transform")
+        TPIPELOGGER.info(f"EmbeddingMerger : merging embeddings ({"train" if not self.is_fitted else "test"} data)")
         try:
             X_transformed: pd.DataFrame = X.copy(deep=True)
             designation_cols = [col for col in X_transformed.columns if "designation" in col]
@@ -551,10 +545,10 @@ class EmbeddingMerger(BaseEstimator, TransformerMixin):
                 to_add = {c3: X_transformed[c1] + X_transformed[c2] for c1, c2, c3 in zip(designation_cols, description_cols, new_cols)}
                 X_transformed = pd.concat([X_transformed, pd.DataFrame(to_add, index=X_transformed.index)], axis=1)
             X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
-            TPIPELOGGER.info("EmbeddingMerger > transform > OK")
+            self.is_fitted = True
             return X_transformed
         except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingMerger > transform : {e}")
+            TPIPELOGGER.error(f"EmbeddingMerger : transform - {e}")
             exit(1)
 
 
@@ -581,6 +575,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         self.scaling_type_: Literal["standard", "robust", "minmax"] = scaling
         self.excluded_cols_: list[str] = excluded_cols
         self.used_cols_: list[str] = []
+        self.is_fitted: bool = False
         if scaling == "robust":
             from sklearn.preprocessing import RobustScaler
             self.scaler_ = RobustScaler()
@@ -619,14 +614,14 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
             pd.DataFrame: The scaled dataframe.
         """
 
-        TPIPELOGGER.info("EmbeddingScaler > transform")
+        TPIPELOGGER.info(f"EmbeddingScaler : scaling embeddings ({"train" if not self.is_fitted else "test"} data)")
         try:
             X_transformed: pd.DataFrame = X.copy(deep=True)
             X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
-            TPIPELOGGER.info("EmbeddingScaler > transform > OK")
+            self.is_fitted = True
             return X_transformed
         except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingScaler > transform : {e}")
+            TPIPELOGGER.error(f"EmbeddingScaler : transform - {e}")
             exit(1)
 
 
@@ -635,10 +630,11 @@ class LabelResampler(BaseSampler):
         super().__init__()
         self.k_neighbors_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["kNeighbors"]
         self.random_state_: int = PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["params"]["randomState"]
+        self.is_fitted: bool = False
         return None
 
     def _fit_resample(self, /, X: pd.DataFrame, y: pd.DataFrame, **fit_params) -> tuple[pd.DataFrame, pd.DataFrame]:  # type: ignore
-        TPIPELOGGER.info("LabelResampler > _fit_resample")
+        TPIPELOGGER.info(f"LabelResampler : resampling ({"train" if not self.is_fitted else "test"} data)")
         try:
             labels: pd.Series = y["prdtypecode"]
             n_labels: int = labels.nunique()
@@ -666,8 +662,8 @@ class LabelResampler(BaseSampler):
             df_final = pd.concat(final_dfs).sample(frac=1, random_state=self.random_state_)
 
             X_transformed, y_transformed = df_final.drop(columns=["label"]), df_final[["label"]]
-            TPIPELOGGER.info("LabelResampler > _fit_resample > OK")
+            self.is_fitted = True
             return X_transformed, y_transformed
         except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingScaler > _fit_resample : {e}")
+            TPIPELOGGER.error(f"EmbeddingScaler : _fit_resample - {e}")
             exit(1)

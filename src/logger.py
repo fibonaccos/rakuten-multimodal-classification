@@ -1,12 +1,12 @@
 import logging
-from typing import Literal
+from typing import Any
 
 
 def build_logger(name: str,
                  filepath: str,
                  baseformat: str,
                  dateformat: str,
-                 level: logging._Level) -> logging.Logger:
+                 level: Any) -> logging.Logger:
     lgr = logging.getLogger(name)
     lgr.setLevel(level)
     if not lgr.handlers:

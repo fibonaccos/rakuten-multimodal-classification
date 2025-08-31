@@ -21,8 +21,8 @@ LOG_CONFIG = get_config("LOGS")
 
 PIPELOGGER = build_logger(name="pipeline",
                           filepath=LOG_CONFIG["filePath"],
-                          baseformat=LOG_CONFIG["format"],
-                          dateformat=LOG_CONFIG["dateformat"],
+                          baseformat=LOG_CONFIG["baseFormat"],
+                          dateformat=LOG_CONFIG["dateFormat"],
                           level=logging.INFO)
 
 
@@ -32,9 +32,9 @@ def pipe() -> None:
     The main preprocessing pipeline.
     """
 
-    PIPELOGGER.info("pipe > launched")
+    PIPELOGGER.info("pipe : started")
     text_pipe()
-    PIPELOGGER.info("pipe > finished")
+    PIPELOGGER.info("pipe : finished")
     return None
 
 
@@ -47,7 +47,8 @@ def text_pipe() -> None:
         None:
     """
 
-    PIPELOGGER.info("text_pipe > launched")
+    PIPELOGGER.info("text_pipe : started")
+    PIPELOGGER.info("text_pipe : reading raw data")
     if PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"] <= 0:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
@@ -65,10 +66,10 @@ def text_pipe() -> None:
 
     pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
 
-    PIPELOGGER.info("text_pipe > fit_transform")
+    PIPELOGGER.info("text_pipe : processing train data")
     clean_X_train = pipe.fit_transform(X_train, y_train)
 
-    PIPELOGGER.info("text_pipe > transform")
+    PIPELOGGER.info("text_pipe : processing test data")
     clean_X_test = pipe.transform(X_test)
 
     clean_train = pd.DataFrame(clean_X_train)
@@ -76,12 +77,12 @@ def text_pipe() -> None:
     clean_test = pd.DataFrame(clean_X_test)
     clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
-    PIPELOGGER.info("text_pipe > to_csv > train")
+    PIPELOGGER.info("text_pipe : saving train data")
     clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False)
-    PIPELOGGER.info("text_pipe > to_csv > test")
+    PIPELOGGER.info("text_pipe : saving test data")
     clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False)
 
-    PIPELOGGER.info("text_pipe > finished")
+    PIPELOGGER.info("text_pipe : finished")
     return None
 
 

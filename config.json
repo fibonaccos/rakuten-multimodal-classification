@@ -33,7 +33,7 @@
                     "active": 1,
                     "params": {
                         "strategy": "equal",
-                        "kNeighbors": 3,
+                        "kNeighbors": 5,
                         "randomState": 5
                     }
                 }
@@ -53,8 +53,8 @@
         }
     },
     "LOGS": {
-        "filePath": "~/Projets/rakuten-multimodal-classification/.logs/{DATE}_",
-        "baseFormat": "%(asctime)s [%(levelname)s] %(message)s",
+        "filePath": ".logs/{DATE}_",
+        "baseFormat": "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
         "dateFormat": "%Y-%m-%d %H:%M:%S"
     }
 }
