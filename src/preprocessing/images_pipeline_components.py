@@ -110,7 +110,7 @@ class RandomImageBlur(nn.Module):
         super().__init__()
         ksize: float = random.randint(3, 5)
         sigma: float = (random.uniform(0.1, 2))
-        self.blurrer_ = K.RandomGaussianBlur(kernel_size=(ksize, ksize), sigma=sigma, p=1.0)
+        self.blurrer_ = K.RandomGaussianBlur(kernel_size=(ksize, ksize), sigma=(sigma, sigma), p=1.0)
         self.p_: float = p
         return None
 
