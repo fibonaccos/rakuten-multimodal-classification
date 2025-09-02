@@ -10,24 +10,44 @@
             "cleanImageTestFolder": ".data/clean/image_test/"
         },
         "PIPELINE": {
-            "sampleSize": 5000,
+            "sampleSize": 500,
             "trainSize": 0.7,
             "randomState": 42,
             "TEXTPIPELINE": {
                 "CONSTANTS": {
                     "textualColumns": ["designation", "description"],
                     "alphanumCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
-                    "ponctuationCharacters": "!\"$%&'()+,-./\\:;?[]^_`|~",
-                    "accentCharacters": "àâäçéèêëîïôöùûüÿœæ",
-                    "maxTokenVectorizer": 500
+                    "ponctuationCharacters": "!\"$%&'()+,-./:;?[]^_`|~ ",
+                    "accentCharacters": "àâäçéèêëîïôöùûüÿœæÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒÆ",
+                    "maxTokenVectorizer": 128,
+                    "embeddingDimension": 384
                 },
                 "STEPS": [
-                    {"stepName": "character_cleaning", "transformer": "CharacterCleaner", "params": {}},
-                    {"stepName": "text_embedding", "transformer": "Vectorizer", "params": {"model": "paraphrase-multilingual-MiniLM-L12-v2"}},
-                    {"stepName": "column_expanding", "transformer": "EmbeddingExpander", "params": {}},
-                    {"stepName": "embedding_merging", "transformer": "EmbeddingMerger", "params": {"rule": "mean"}},
-                    {"stepName": "scaling", "transformer": "EmbeddingScaler",
-                        "params": {"scaling": "normal", "excluded_cols": ["productid", "imageid", "description_norm"]}}
+                    {
+                        "stepName": "character_cleaning",
+                        "transformer": "CharacterCleaner",
+                        "params": {}
+                    },
+                    {
+                        "stepName": "text_embedding",
+                        "transformer": "Vectorizer",
+                        "params": {
+                            "model": "paraphrase-multilingual-MiniLM-L12-v2"
+                        }
+                    },
+                    {
+                        "stepName": "merge_imputing",
+                        "transformer": "MergeImputer",
+                        "params": {"reule": "mean"}
+                    },
+                    {
+                        "stepName": "scaling",
+                        "transformer": "EmbeddingScaler",
+                        "params": {
+                            "scaling": "normal",
+                            "excluded_cols": ["productid", "imageid", "designation", "description"]
+                        }
+                    }
                 ],
                 "RESAMPLING": {
                     "active": false,
@@ -43,15 +63,73 @@
                     "imageShape": [500, 500, 3]
                 },
                 "STEPS": [
-                    {"stepName": "rotation", "transformer": "RandomImageRotation", "params": {"degree": 180, "p": 0.5}},
-                    {"stepName": "flip", "transformer": "RandomImageFlip", "params": {"horizontal": true, "vertical": true, "p": 0.5}},
-                    {"stepName": "crop", "transformer": "RandomImageCrop", "params": {"p": 0.5}},
-                    {"stepName": "zoom", "transformer": "RandomImageZoom", "params": {"factor": 0.3, "p": 0.5}},
-                    {"stepName": "blur", "transformer": "RandomImageBlur", "params": {"p": 0.5}},
-                    {"stepName": "noise", "transformer": "RandomImageNoise", "params": {"std": 1, "p": 0.5}},
-                    {"stepName": "contrast", "transformer": "RandomImageContrast", "params": {"p": 0.5}},
-                    {"stepName": "coloration", "transformer": "RandomImageColoration", "params": {"p": 0.5}},
-                    {"stepName": "dropout", "transformer": "RandomImageDropout", "params": {"p": 0.5}}
+                    {
+                        "stepName": "rotation",
+                        "transformer": "RandomImageRotation",
+                        "params": {
+                            "degree": 180,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "flip",
+                        "transformer": "RandomImageFlip",
+                        "params": {
+                            "horizontal": true,
+                            "vertical": true,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "crop",
+                        "transformer": "RandomImageCrop",
+                        "params": {
+                            "crop_window": [350, 450],
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "zoom",
+                        "transformer": "RandomImageZoom",
+                        "params": {
+                            "factor": 0.3, "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "blur",
+                        "transformer": "RandomImageBlur",
+                        "params": {
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "noise",
+                        "transformer": "RandomImageNoise",
+                        "params": {
+                            "std": 1, "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "contrast",
+                        "transformer": "RandomImageContrast",
+                        "params": {
+                            "factor": 0.5, "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "coloration",
+                        "transformer": "RandomImageColoration",
+                        "params": {
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "dropout",
+                        "transformer": "RandomImageDropout",
+                        "params": {
+                            "p": 0.5
+                        }
+                    }
                 ]
             }
         }

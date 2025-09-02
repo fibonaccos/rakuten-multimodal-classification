@@ -1,12 +1,3 @@
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from imblearn.over_sampling import SMOTE
-from imblearn.under_sampling import TomekLinks
-from typing import Any
-import pandas as pd
-#import images_pipeline_components as ipipe
-import textual_pipeline_components as tpipe
-
 import sys
 import os
 import logging
@@ -27,16 +18,29 @@ PIPELOGGER = build_logger(name="pipeline",
                           dateformat=LOG_CONFIG["dateFormat"],
                           level=logging.INFO)
 
+PIPELOGGER.info("Running main_pipeline.py")
+PIPELOGGER.info("Resolving imports on main_pipeline.py")
+
+
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import TomekLinks
+from typing import Any
+import pandas as pd
+import images_pipeline_components as ipipe
+import textual_pipeline_components as tpipe
+
 
 @timer
 def pipe() -> None:
     """
-    The main preprocessing pipeline. It uses the metadata from the config.json file
+    The main preprocessing pipeline. It uses the metadata from the config.json file.
     """
 
-    PIPELOGGER.info("pipe : started")
+    PIPELOGGER.info("Running pipe")
     text_pipe()
-    PIPELOGGER.info("pipe : finished")
+    PIPELOGGER.info("pipe completed")
     return None
 
 
@@ -49,8 +53,8 @@ def text_pipe() -> None:
         None:
     """
 
-    PIPELOGGER.info("text_pipe : started")
-    PIPELOGGER.info("text_pipe : reading raw data")
+    PIPELOGGER.info("Running text_pipe")
+    PIPELOGGER.info("Reading textual raw data")
     if PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"] <= 0:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
@@ -68,14 +72,14 @@ def text_pipe() -> None:
 
     pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
 
-    PIPELOGGER.info("text_pipe : processing train data")
+    PIPELOGGER.info("Processing textual train data")
     clean_X_train = pipe.fit_transform(X_train, y_train)
 
-    PIPELOGGER.info("text_pipe : processing test data")
+    PIPELOGGER.info("Processing textual test data")
     clean_X_test = pipe.transform(X_test)
 
     if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["active"]:
-        PIPELOGGER.info("text_pipe : resampling train data")
+        PIPELOGGER.info("Resampling textual train data")
         clean_X_train, y_train = tpipe.LabelResampler().fit_resample(pd.DataFrame(clean_X_train), pd.DataFrame(y_train))  # type: ignore
 
     clean_train = pd.DataFrame(clean_X_train)
@@ -83,12 +87,12 @@ def text_pipe() -> None:
     clean_test = pd.DataFrame(clean_X_test)
     clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
-    PIPELOGGER.info("text_pipe : saving train data")
+    PIPELOGGER.info("Saving textual train data")
     clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False)
-    PIPELOGGER.info("text_pipe : saving test data")
+    PIPELOGGER.info("Saving textual test data")
     clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False)
 
-    PIPELOGGER.info("text_pipe : finished")
+    PIPELOGGER.info("text_pipe completed")
     return None
 
 
@@ -98,6 +102,10 @@ def image_pipe() -> None:
     Execute the image preprocessing pipeline using metadata from config.json file.
     """
 
+    PIPELOGGER.info("Running image_pipe")
+    steps_config = PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]
+    steps = [getattr(ipipe, step["transformer"])(**step["params"]) for step in steps_config]
+    PIPELOGGER.info("image_pipe completed")
     return None
 
 
