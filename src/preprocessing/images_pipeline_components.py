@@ -22,19 +22,16 @@ IPIPELOGGER.info("Running image_pipeline_components.py")
 IPIPELOGGER.info("Resolving imports on image_pipeline_components.py")
 
 
-from typing import Any
 import torch
 import torch.nn as nn
 import kornia.augmentation as K
 import kornia.enhance as KE
 import kornia.color as KC
-import numpy as np
-import hashlib
 import random
+from typing import Any
 
 
-__all__ = ["seed_from_id",
-           "RandomImageRotation",
+__all__ = ["RandomImageRotation",
            "RandomImageFlip",
            "RandomImageCrop",
            "RandomImageZoom",
@@ -45,39 +42,14 @@ __all__ = ["seed_from_id",
            "RandomImageDropout"]
 
 
-def seed_from_id(image_id: str) -> None:
-    """
-    Initialize seeds for several modules used to transform images. It will ensure unicity and
-    reproducibility for each image of the dataset.
-
-    Args:
-        image_id (str): The id of the image
-
-    Returns:
-        None:
-    """
-
-    seed = int(hashlib.md5(image_id.encode()).hexdigest(), 16) % (2**32)
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-    return None
-
-
 class RandomImageRotation(nn.Module):
     def __init__(self, /, degree: float, p: float) -> None:
         super().__init__()
-        self.degree_ = degree
-        self.p_ = p
+        self.rotator_ = K.RandomRotation(degrees=degree, p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            angle = random.uniform(-self.degree_, self.degree_)
-            x = K.RandomRotation(degrees=(angle, angle), p=1.0)(x)
-        return x
+        return self.rotator_(x)
 
 
 class RandomImageFlip(nn.Module):
@@ -85,69 +57,67 @@ class RandomImageFlip(nn.Module):
         super().__init__()
         self.hflip_: bool = horizontal
         self.vflip_: bool = vertical
-        self.p_: float = p
+        self.hflipper_ = K.RandomHorizontalFlip(p=p)
+        self.vflipper_ = K.RandomVerticalFlip(p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if self.hflip_ and random.random() < self.p_:
-            x = K.RandomHorizontalFlip(p=1.0)(x)
-        if self.vflip_ and random.random() < self.p_:
-            x = K.RandomVerticalFlip(p=1.0)(x)
+        transf = []
+        indices = torch.randperm(2)
+        if self.hflip_:
+            transf.append(self.hflipper_)
+        if self.vflip_:
+            transf.append(self.vflipper_)
+        for i in indices:
+            x = transf[i](x)
         return x
 
 
 class RandomImageCrop(nn.Module):
     def __init__(self, /, crop_window: list[int], p: float) -> None:
         super().__init__()
-        self.p_: float = p
-        crop1, crop2 = random.randint(*crop_window), random.randint(*crop_window)
-        self.croper_ = K.RandomCrop(size=(crop1, crop2), p=1.)
+        crop_values = torch.randint(crop_window[0], crop_window[1] + 1, (2, )).tolist()
+        self.croper_ = K.RandomCrop(size=(crop_values[0], crop_values[1]), p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            x = self.croper_(x)
-        return x
+        return self.croper_(x)
 
 
 class RandomImageZoom(nn.Module):
     def __init__(self, /, factor: float, p: float) -> None:
         super().__init__()
-        scale1, scale2 = random.uniform(-factor, factor), random.uniform(-factor, factor)
-        self.zoomer_ = K.RandomResizedCrop(size=tuple(PREPROCESSING_CONFIG["CONSTANTS"]["imageShape"][:2]), scale=(1 + scale1, 1 + scale2), ratio=(1., 1.), p=1.0)
-        self.p_: float = p
+        scale1, scale2 = torch.empty(2).uniform_(-factor, factor).tolist()
+        self.zoomer_ = K.RandomResizedCrop(
+            size=tuple(PREPROCESSING_CONFIG["CONSTANTS"]["imageShape"][:2]),
+            scale=(1 + scale1, 1 + scale2), ratio=(1., 1.), p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            x = self.zoomer_(x)
-        return x
+        return self.zoomer_(x)
 
 
 class RandomImageBlur(nn.Module):
     def __init__(self, /, p: float) -> None:
         super().__init__()
-        ksize: float = random.randint(3, 5)
-        sigma: float = (random.uniform(0.1, 2))
-        self.blurrer_ = K.RandomGaussianBlur(kernel_size=(ksize, ksize), sigma=(sigma, sigma), p=1.0)
+        sigma1, sigma2 = torch.empty(2).uniform_(0.5, 1.5).tolist()
+        self.blurrer_ = K.RandomGaussianBlur(kernel_size=(3, 3), sigma=(sigma1, sigma2), p=p)
         self.p_: float = p
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            x = self.blurrer_(x)
-        return x
+        return self.blurrer_(x)
 
 
 class RandomImageNoise(nn.Module):
-    def __init__(self, /, std: float, p: float) -> None:
+    def __init__(self, /, p: float) -> None:
         super().__init__()
-        self.std_: float = random.uniform(0.5 * std, 1.5 * std)
+        self.std_: float = torch.empty(1).uniform_(0.5, 1.5).item()
         self.p_: float = p
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
+        if torch.rand() < self.p_:
             noise = torch.randn_like(x) * self.std_
             x = torch.clamp(x + noise, 0, 1)
         return x
@@ -157,11 +127,11 @@ class RandomImageContrast(nn.Module):
     def __init__(self, /, factor: float, p: float) -> None:
         super().__init__()
         self.p_: float = p
-        self.factor_: float = random.uniform(1 - factor, 1 + factor)
+        self.factor_: float = torch.empty(1).uniform_(1 - factor, 1 + factor).item()
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
+        if torch.rand() < self.p_:
             x = KE.adjust_contrast(x, self.factor_)
         return x
 
@@ -173,8 +143,9 @@ class RandomImageColoration(nn.Module):
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            choice = random.choice(["invert", "grayscale", "permute"])
+        if torch.rand(1) < self.p_:
+            i = torch.randint(0, 3, (1,))
+            choice = ["invert", "grayscale", "permute"][i]
             if choice == "invert":
                 x = 1.0 - x
             if choice == "grayscale":
@@ -189,21 +160,8 @@ class RandomImageColoration(nn.Module):
 class RandomImageDropout(nn.Module):
     def __init__(self, /, dropout: float, p: float) -> None:
         super().__init__()
-        self.p_: float = p
-        self.dropper_ = K.RandomErasing(scale=(dropout, dropout), ratio=(1.0, 1.0), p=1.0)
+        self.dropper_ = K.RandomErasing(scale=(dropout, dropout), ratio=(1.0, 1.0), p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if random.random() < self.p_:
-            x = self.dropper_(x)
-        return x
-
-
-class ImagePipeline(nn.Module):
-    def __init__(self, /, transformations: list[nn.Module]) -> None:
-        super().__init__()
-        self.transformations_ = nn.Sequential(*transformations)
-        return None
-
-    def forward(self, x):
-        return self.transformations_(x)
+        return self.dropper_(x)

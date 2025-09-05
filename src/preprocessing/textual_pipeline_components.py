@@ -24,9 +24,8 @@ TPIPELOGGER.info("Resolving imports on textual_pipeline_components.py")
 
 from typing import Any, Literal
 from sklearn.base import BaseEstimator, TransformerMixin
-from imblearn.base import BaseSampler
-from imblearn.over_sampling import SMOTE
-from imblearn.under_sampling import TomekLinks
+from sklearn.impute import KNNImputer
+from sklearn.metrics.pairwise import cosine_similarity
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import numpy as np
@@ -36,9 +35,8 @@ import re
 
 __all__ = ["CharacterCleaner",
            "Vectorizer",
-           "MergeImputer",
-           "EmbeddingScaler",
-           "LabelResampler"]
+           "CosineImputer",
+           "EmbeddingScaler"]
 
 
 TEXTUAL_COLUMNS: list[str] = TPIPE_CONFIG["CONSTANTS"]["textualColumns"]
@@ -232,15 +230,29 @@ class Vectorizer(BaseEstimator, TransformerMixin):
             pd.DataFrame: A new dataframe with embedded textual columns.
         """
 
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        for col in TEXTUAL_COLUMNS:
-            TPIPELOGGER.info(f"Vectorizer : encoding {col}  ({"train" if not self.is_fitted else "test"} data)")
-            X_transformed = self._vectorize(X_transformed, col)
-        self.is_fitted = True
-        return X_transformed
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            for col in TEXTUAL_COLUMNS:
+                TPIPELOGGER.info(f"Vectorizer : encoding {col}  ({"train" if not self.is_fitted else "test"} data)")
+                X_transformed = self._vectorize(X_transformed, col)
+            self.is_fitted = True
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"Vectorizer : transform - {e}")
+            exit(1)
 
     def _encode(self, /, text: Any) -> Any:
         # ESSAYER D'OPTIMISER CETTE FONCTION
+        """
+        Encode a text using `self.model_`.
+
+        Args:
+            text (Any): The text to encode. 
+
+        Returns:
+            Any: If `text` is a missing value, returns a list of `None` values of length of embeddings. If
+                `text` is a str value, returns a `np.ndarray` of shape (*embedding_dim*, ).
+        """
 
         if not isinstance(text, str) or text.strip() == "":
             return [None for _ in range(EMBEDDING_DIM)]
@@ -274,76 +286,74 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         return pd.concat([X, expanded_X], axis=1)
 
 
-# AJOUTER ICI UNE CLASSE POUR LE REMPLISSAGE DES VALEURS MANQUANTES
+def compute_cosine_sim(x: np.ndarray, y: np.ndarray) -> float:
+    mask = (np.isnan(x)) | (np.isnan(y))
+    if mask.sum() != 0:
+        return np.nan
+    return 1. - cosine_similarity(x.reshape(1, -1), y.reshape(1, -1))[0, 0]
 
 
-class MergeImputer(BaseEstimator, TransformerMixin):
+class CosineImputer(BaseEstimator, TransformerMixin):
     """
-    Merge embedded features (designation and description) to reduce dimension and fill missing values.
+    A transformer for imputing missing values using KNN algorithm. It is a wrapper of the `KNNImputer` class from
+    `sklearn` used with a cosine_similarity metric to better adapt the high dimensional embeddings.
     """
 
-    def __init__(self, /, rule: Literal["mean", "abs"] = "mean") -> None:
+    def __init__(self, /, n_neighbors: int, excluded_cols: list[str]) -> None:
         """
-        Create a new `EmbeddingMerger` instance.
 
         Args:
-            rule (Literal["mean", "abs"], Optional): The merging rule to use on the features. If "mean", takes the mean of
-                the `designation` and `description` embeddings. If "abs", takes the biggest value from an absolute
-                comparison, i.e. if v1 = -6 and v2 = 2, it takes v1. If a description is missing, it imputes the
-                designation value. Default to "mean".
+            n_neighbors (int): The number of neighbors to for imputing.
+            excluded_cols (list[str]): The useless columns for the transformation. Should be all columns which
+                are not a part of embeddings.
 
         Returns:
-            EmbeddingMerger: A new `EmbeddingMerger` instance.
+            CosineImputer: A new instance of `CosineImputer`.
         """
 
         super().__init__()
-        self.rule_: Literal["mean", "abs"] = rule
-        self.is_fitted: bool = False
+        self.excluded_cols_: list[str] = excluded_cols
+        self.used_cols_: list[str] = []
+        self.metric_ = lambda x, y, *, missing_values=np.nan: compute_cosine_sim(x, y)
+        self.imputer_: KNNImputer = KNNImputer(n_neighbors=n_neighbors, metric=self.metric_)
+        self.is_fitted_: bool = False
         return None
 
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MergeImputer:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> CosineImputer:
         """
-        Does nothing. Here for `sklearn` API compatibility only.
+        Fit the algorithm on the right columns.
 
         Args:
-            X (pd.DataFrame): The variables dataset.
-            y (Any, optional): The predictions dataset. Defaults to None.
+            X (pd.DataFrame): The dataframe containing the missing values.
+            y (Any, optional): Unused. Here for API consistency only.
 
         Returns:
-            EmbeddingMerger: The fitted transformer.
+            CosineImputer: The fitted transformer.
         """
+
+        self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
+        self.imputer_.fit(X[self.used_cols_], y)
         return self
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Reduce the embeddings and fill missing descriptions.
+        Transform the dataframe `X` using the fitted `CosineImputer`.
 
         Args:
-            X (pd.DataFrame): The dataframe on which apply the transformation.
+            X (pd.DataFrame): The dataframe to transform.
 
         Returns:
-            pd.DataFrame: The reduces dataframe withou missing values.
+            pd.DataFrame: The transformed dataframe without missing values.
         """
 
-        TPIPELOGGER.info(f"EmbeddingMerger : merging embeddings ({"train" if not self.is_fitted else "test"} data)")
         try:
+            TPIPELOGGER.info(f"Imputing missing values ({"train" if not self.is_fitted_ else "test"} data)")
             X_transformed: pd.DataFrame = X.copy(deep=True)
-            designation_cols = [col for col in X_transformed.columns if "designation" in col]
-            description_cols = [col for col in X_transformed.drop(columns=["description_norm"]).columns if "description" in col]
-            new_cols = ["feature_" + str(i + 1) for i in range(len(designation_cols))]
-            for c1, c2 in zip(designation_cols, description_cols):
-                X_transformed.loc[X_transformed["description_norm"] == 0, c2] = X_transformed.loc[X_transformed["description_norm"] == 0, c1]
-            if self.rule_ == "abs":
-                for i in range(len(new_cols)):
-                    X_transformed[new_cols[i]] = X_transformed[[designation_cols[i], description_cols[i]]].apply(lambda v1, v2: v1 if abs(v1) > abs(v2) else v2, axis=1)
-            else:
-                to_add = {c3: X_transformed[c1] + X_transformed[c2] for c1, c2, c3 in zip(designation_cols, description_cols, new_cols)}
-                X_transformed = pd.concat([X_transformed, pd.DataFrame(to_add, index=X_transformed.index)], axis=1)
-            X_transformed = X_transformed.drop(columns=designation_cols + description_cols)
-            self.is_fitted = True
+            X_transformed[self.used_cols_] = self.imputer_.transform(X_transformed[self.used_cols_])
+            self.is_fitted_ = True
             return X_transformed
         except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingMerger : transform - {e}")
+            TPIPELOGGER.error(f"EmbeddingScaler : transform - {e}")
             exit(1)
 
 
@@ -395,7 +405,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
         """
 
         self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
-        self.scaler_.fit(X[self.used_cols_])
+        self.scaler_.fit(X[self.used_cols_], y)
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
@@ -409,7 +419,7 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
             pd.DataFrame: The scaled dataframe.
         """
 
-        TPIPELOGGER.info(f"EmbeddingScaler : scaling embeddings ({"train" if not self.is_fitted else "test"} data)")
+        TPIPELOGGER.info(f"Scaling embeddings ({"train" if not self.is_fitted else "test"} data)")
         try:
             X_transformed: pd.DataFrame = X.copy(deep=True)
             X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
@@ -417,49 +427,4 @@ class EmbeddingScaler(BaseEstimator, TransformerMixin):
             return X_transformed
         except Exception as e:
             TPIPELOGGER.error(f"EmbeddingScaler : transform - {e}")
-            exit(1)
-
-
-class LabelResampler(BaseSampler):
-    def __init__(self, /) -> None:
-        super().__init__()
-        self.k_neighbors_: int = TPIPE_CONFIG["RESAMPLING"]["params"]["kNeighbors"]
-        self.random_state_: int = TPIPE_CONFIG["RESAMPLING"]["params"]["randomState"]
-        self.is_fitted: bool = False
-        return None
-
-    def _fit_resample(self, /, X: pd.DataFrame, y: pd.DataFrame, **fit_params) -> tuple[pd.DataFrame, pd.DataFrame]:  # type: ignore
-        TPIPELOGGER.info(f"LabelResampler : resampling ({"train" if not self.is_fitted else "test"} data)")
-        try:
-            labels: pd.Series = y["prdtypecode"]
-            n_labels: int = labels.nunique()
-            n_target: int = int(X.shape[0] / n_labels)
-            strategy: dict = {}
-            if TPIPE_CONFIG["RESAMPLING"]["params"]["strategy"] == "equal":
-                for label in labels.unique():
-                    if labels.value_counts()[label] < n_target:
-                        strategy[label] = n_target
-            else:
-                strategy = TPIPE_CONFIG["RESAMPLING"]["params"]["strategy"]
-
-            smote = SMOTE(sampling_strategy=strategy, k_neighbors=self.k_neighbors_, random_state=self.random_state_)  # type: ignore
-            X_os, y_os = smote.fit_resample(X, labels)  # type: ignore
-
-            tomek = TomekLinks()
-            X_res, y_res = tomek.fit_resample(X_os, y_os)  # type: ignore
-
-            X_res["label"] = y_res
-            final_dfs = []
-            for label in labels.unique():
-                label_df = X_res[X_res["label"] == label]
-                if label_df.shape[0] > n_target:
-                    label_df = label_df.sample(n=n_target, random_state=self.random_state_)
-                final_dfs.append(label_df)
-            df_final = pd.concat(final_dfs).sample(frac=1, random_state=self.random_state_)
-
-            X_transformed, y_transformed = df_final.drop(columns=["label"]), df_final[["label"]]
-            self.is_fitted = True
-            return X_transformed, y_transformed
-        except Exception as e:
-            TPIPELOGGER.error(f"EmbeddingScaler : _fit_resample - {e}")
             exit(1)

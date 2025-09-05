@@ -10,9 +10,10 @@
             "cleanImageTestFolder": ".data/clean/image_test/"
         },
         "PIPELINE": {
-            "sampleSize": 500,
+            "sampleSize": 1000,
             "trainSize": 0.7,
             "randomState": 42,
+            "multithread": true,
             "TEXTPIPELINE": {
                 "CONSTANTS": {
                     "textualColumns": ["designation", "description"],
@@ -36,9 +37,11 @@
                         }
                     },
                     {
-                        "stepName": "merge_imputing",
-                        "transformer": "MergeImputer",
-                        "params": {"reule": "mean"}
+                        "stepName": "knn_imputing",
+                        "transformer": "CosineImputer",
+                        "params": {
+                            "n_neighbors": 5,
+                            "excluded_cols": ["productid", "imageid", "description", "designation"]}
                     },
                     {
                         "stepName": "scaling",
@@ -60,7 +63,9 @@
             },
             "IMAGEPIPELINE": {
                 "CONSTANTS" : {
-                    "imageShape": [500, 500, 3]
+                    "imageShape": [500, 500, 3],
+                    "batchSize": 32,
+                    "multithread": true
                 },
                 "STEPS": [
                     {
@@ -106,14 +111,15 @@
                         "stepName": "noise",
                         "transformer": "RandomImageNoise",
                         "params": {
-                            "std": 1, "p": 0.5
+                            "p": 0.5
                         }
                     },
                     {
                         "stepName": "contrast",
                         "transformer": "RandomImageContrast",
                         "params": {
-                            "factor": 0.5, "p": 0.5
+                            "factor": 0.5,
+                            "p": 0.5
                         }
                     },
                     {
@@ -127,6 +133,7 @@
                         "stepName": "dropout",
                         "transformer": "RandomImageDropout",
                         "params": {
+                            "dropout": [0.0, 0.15],
                             "p": 0.5
                         }
                     }
