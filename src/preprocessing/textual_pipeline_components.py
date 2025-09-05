@@ -1,60 +1,71 @@
 from __future__ import annotations
+
+import sys
+import os
+import logging
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from src.config_loader import get_config
+from src.logger import build_logger
+
+
+TPIPE_CONFIG = get_config("PREPROCESSING")["PIPELINE"]["TEXTPIPELINE"]
+LOG_CONFIG = get_config("LOGS")
+TPIPELOGGER = build_logger(name="textual_pipeline_components",
+                           filepath=LOG_CONFIG["filePath"],
+                           baseformat=LOG_CONFIG["baseFormat"],
+                           dateformat=LOG_CONFIG["dateFormat"],
+                           level=logging.INFO)
+
+TPIPELOGGER.info("Running textual_pipeline_components.py")
+TPIPELOGGER.info("Resolving imports on textual_pipeline_components.py")
+
+
 from typing import Any, Literal
-from pathlib import Path
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.impute import KNNImputer
+from sklearn.metrics.pairwise import cosine_similarity
 from bs4 import BeautifulSoup
-import re
-import nltk
-from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
+import re
 
 
-__all__ = ["DATASET_TEXT_PATH",
-           "TEXTUAL_COLUMNS",
-           "ACCEPTED_CHARACTERS",
-           "MAX_TOKENS_VECTORIZER",
-           "CharacterCleaner",
+__all__ = ["CharacterCleaner",
            "Vectorizer",
-           "EmbeddingExpander",
-           "MissingEmbeddingFiller"]
+           "CosineImputer",
+           "EmbeddingScaler"]
 
 
-DATASET_TEXT_PATH: dict[str, Path] = {"xtrain": Path(__file__).cwd() / "../data/X_train.csv",
-                                      "ytrain": Path(__file__).cwd() / "../data/Y_train.csv"}
-""" Paths to local textual datasets (keyed as "xtrain", "ytrain") given as a dict. """
+TEXTUAL_COLUMNS: list[str] = TPIPE_CONFIG["CONSTANTS"]["textualColumns"]
 
-
-TEXTUAL_COLUMNS: list[str] = ["designation", "description"]
-""" Name of textual columns to preprocess found in the original datasets. """
-
-
-# Lists of characters given as Unicode int that we may want to keep
-ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"]
-PONCTUATION_CHARACTERS: list[int] = [ord(c) for c in "!\"$%&'()+,-./\\:;?[]^_`|~"]
-ACCENTS_CHARACTERS: list[int] =  [ord(c) for c in 'àâäçéèêëîïôöùûüÿœæ']
+ALPHANUM_CHARACTERS: list[int] = [ord(c) for c in TPIPE_CONFIG["CONSTANTS"]["alphanumCharacters"]]
+PONCTUATION_CHARACTERS: list[int] = [ord(c) for c in TPIPE_CONFIG["CONSTANTS"]["ponctuationCharacters"]]
+ACCENTS_CHARACTERS: list[int] =  [ord(c) for c in TPIPE_CONFIG["CONSTANTS"]["accentCharacters"]]
 
 ACCEPTED_CHARACTERS: list[int] = ALPHANUM_CHARACTERS + PONCTUATION_CHARACTERS + ACCENTS_CHARACTERS
-""" List of all the characters to keep encoded in integers. """
 
-
-MAX_TOKENS_VECTORIZER: int = 500
-""" The maximum number of tokens to use in `Vectorizer`. Depends on the model used. """
+MAX_TOKENS_VECTORIZER: int = TPIPE_CONFIG["CONSTANTS"]["maxTokenVectorizer"]
+EMBEDDING_DIM: int = TPIPE_CONFIG["CONSTANTS"]["embeddingDimension"]
 
 
 class CharacterCleaner(BaseEstimator, TransformerMixin):
     """
     A transformer to clean textual data and keep characters from `ACCEPTED_CHARACTERS`.
     """
-    def __init__(self) -> None:
+
+    def __init__(self, /) -> None:
         """
         Create a `CharacterCleaner` instance.
 
         Returns:
-            `CharacterCleaner`: A new instance of `CharacterCleaner`.
+            CharacterCleaner: A new instance of `CharacterCleaner`.
         """
+
         super().__init__()
+        self.is_fitted: bool = False
         self.accepted_characters_: list[int] = ACCEPTED_CHARACTERS
         return None
 
@@ -87,14 +98,14 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: A new dataframe with clean textual columns.
         """
+
         X_transformed: pd.DataFrame = X.copy(deep=True)
-        for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[CharacterCleaner] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
+        for col in TEXTUAL_COLUMNS:
+            TPIPELOGGER.info(f"CharacterCleaner : cleaning {col} ({"train" if not self.is_fitted else "test"} data)")
             X_transformed[col] = X_transformed[col].apply(self._clean_html)
             X_transformed[col] = X_transformed[col].apply(self._keep_accepted_characters)
             X_transformed[col] = X_transformed[col].apply(self._clean_text_format)
-
-        print("\r[CharacterCleaner] - DONE    ")
+        self.is_fitted = True
         return X_transformed
 
     def _clean_html(self, /, text: Any) -> Any:
@@ -109,8 +120,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
-        if isinstance(text, str):
-            return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
+
+        try:
+            if isinstance(text, str):
+                return BeautifulSoup(text.strip(), "html.parser").get_text(separator=" ").strip()
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner : _clean_html - {e}")
+            exit(1)
         return text
 
     def _keep_accepted_characters(self, /, text: Any) -> Any:
@@ -125,8 +141,13 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
-        if isinstance(text, str):
-            return ''.join(c for c in text if ord(c) in self.accepted_characters_)
+
+        try:
+            if isinstance(text, str):
+                return ''.join(c for c in text if ord(c) in self.accepted_characters_).strip()
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner : _keep_accepted_characters - {e}")
+            exit(1)
         return text
 
     def _clean_text_format(self, /, text: Any) -> Any:
@@ -140,23 +161,28 @@ class CharacterCleaner(BaseEstimator, TransformerMixin):
         Returns:
             str: The cleaned text.
         """
-        if isinstance(text, str):
-            text = text.replace('\t', ' ')
-            text = re.sub(r'\b[\w.-]+?@\w+?\.\w+?\b', '', text)
-            text = re.sub(r'https?://\S+|www\.\S+', '', text)
-            text = re.sub(r'\s+', ' ', text)
-            text = text.strip()
+
+        try:
+            if isinstance(text, str):
+                text = text.replace('\t', ' ')
+                text = re.sub(r'\b[\w.-]+?@\w+?\.\w+?\b', '', text)
+                text = re.sub(r'https?://\S+|www\.\S+', '', text)
+                text = re.sub(r'\s+', ' ', text)
+                text = text.strip()
+        except Exception as e:
+            TPIPELOGGER.error(f"CharacterCleaner : _clean_text_format - {e}")
+            exit(1)
         return text
 
 
 class Vectorizer(BaseEstimator, TransformerMixin):
     """
     A transformer to vectorize textual dataset using a `SentenceTransformer` model. As the textual
-    data (especially the *descripion* column) may contains more than 512 tokens, the vectorization
-    is eventually computed on a segmentation of *n* blocks of the text. It leads to *n* vectors
-    representing the text that have to be aggregated. They can be aggregated by mean or by their
-    maximum value.
+    data (especially the *descripion* column) may contains more than the supported number of tokens,
+    the vectorization is eventually computed on a segmentation of *n* blocks of the text. It leads
+    to *n* vectors representing the text aggregated by mean.
     """
+
     def __init__(self, /,
                  model: Literal["paraphrase-multilingual-MiniLM-L12-v2",
                                 "distiluse-base-multilingual-cased-v1",
@@ -169,17 +195,15 @@ class Vectorizer(BaseEstimator, TransformerMixin):
                 is recommended (space dimension : 384). The model **distiluse-base-multilingual-cased-v1** is
                 good but may be heavy (space dimension : 512). The model **paraphrase-multilingual-mpnet-base-v2**
                 is very effective but slow (space dimension : 768).
-            combine_method (Literal[&quot;mean&quot;, &quot;max&quot;], optional): The combining
-                method for vectorization. Defaults to "mean".
 
         Returns:
-            `Vectorizer`: A new instance of `Vectorizer`.
+            Vectorizer: A new instance of `Vectorizer`.
         """
+
         super().__init__()
-        nltk.download("punkt")
-        nltk.download('punkt_tab')
-        self.max_chars_: int = MAX_TOKENS_VECTORIZER
         self.model_: SentenceTransformer = SentenceTransformer(model)
+        self.tokenizer_: Any = self.model_.tokenizer
+        self.is_fitted: bool = False
         return None
 
     def fit(self, /, X: pd.DataFrame, y: Any = None) -> Vectorizer:
@@ -197,7 +221,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Build embeddings of the textual columns of `X`. 
+        Build embeddings of the textual columns of `X` using a prefitted `SentenceTransformer` model. 
 
         Args:
             X (pd.DataFrame): The dataframe to transform.
@@ -205,178 +229,202 @@ class Vectorizer(BaseEstimator, TransformerMixin):
         Returns:
             pd.DataFrame: A new dataframe with embedded textual columns.
         """
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        for i, col in enumerate(TEXTUAL_COLUMNS):
-            print(f"\r[Vectorizer] - {i + 1}/{len(TEXTUAL_COLUMNS)}", end='')
-            X_transformed[col] = X_transformed[col].apply(self._encoder)
-        print("\r[Vectorizer] - DONE    ")
-        return X_transformed
 
-    def _split_text(self, /, text: str) -> list[str]:
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            for col in TEXTUAL_COLUMNS:
+                TPIPELOGGER.info(f"Vectorizer : encoding {col}  ({"train" if not self.is_fitted else "test"} data)")
+                X_transformed = self._vectorize(X_transformed, col)
+            self.is_fitted = True
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"Vectorizer : transform - {e}")
+            exit(1)
+
+    def _encode(self, /, text: Any) -> Any:
+        # ESSAYER D'OPTIMISER CETTE FONCTION
         """
-        Splits a text to a list of subtexts containing less than `MAX_TOKENS_VECTORIZER` tokens.
+        Encode a text using `self.model_`.
 
         Args:
-            text (str): The text to split.
+            text (Any): The text to encode. 
 
         Returns:
-            list[str]: The splitted text with less than `MAX_TOKENS_VECTORIZER` tokens for each
-                subtext.
+            Any: If `text` is a missing value, returns a list of `None` values of length of embeddings. If
+                `text` is a str value, returns a `np.ndarray` of shape (*embedding_dim*, ).
         """
-        sentences: list[str] = sent_tokenize(text, language="french")
-        chunks: list[str] = []
-        current: str = ""
-        for sent in sentences:
-            if len(current) + len(sent) < self.max_chars_:
-                current += " " + sent
+
+        if not isinstance(text, str) or text.strip() == "":
+            return [None for _ in range(EMBEDDING_DIM)]
+
+        tokens = self.tokenizer_.encode(text, add_special_tokens=True, truncation=False)
+
+        if len(tokens) <= MAX_TOKENS_VECTORIZER:
+            return self.model_.encode([text])[0]
+        else:
+            embeddings = []
+            chunks = text.split('.')
+            if max([len(self.tokenizer_.encode(t, add_special_tokens=True, truncation=False)) for t in chunks]) > MAX_TOKENS_VECTORIZER:
+                chunks = text.split(' ')
+                for i in range(len(chunks)):
+                    agg_chunk = ""
+                    while (i < len(chunks)) and (len(self.tokenizer_.encode(agg_chunk, add_special_tokens=True, truncation=False)) <= MAX_TOKENS_VECTORIZER):
+                        agg_chunk += " " + chunks[i]
+                        agg_chunk = agg_chunk.strip()
+                        i += 1
+                    while len(self.tokenizer_.encode(agg_chunk, add_special_tokens=True, truncation=False)) > MAX_TOKENS_VECTORIZER:
+                        agg_chunk = " ".join(agg_chunk.split(" ")[:-1]).strip()
+                    embeddings.append(self.model_.encode([agg_chunk])[0])
             else:
-                chunks.append(current.strip())
-                current = sent
-        if current:
-            chunks.append(current.strip())
-        return chunks
+                for chunk in chunks:
+                    embeddings.append(self.model_.encode([chunk])[0])
+            return np.mean(embeddings, axis=0)
 
-    def _encoder(self, /, text: Any) -> Any:
+    def _vectorize(self, /, X: pd.DataFrame, col: str) -> pd.DataFrame:
+        embeddings = X[col].apply(lambda text: self._encode(text))
+        expanded_X = pd.DataFrame(embeddings.tolist(), columns=[f"{col}_{i + 1}" for i in range(EMBEDDING_DIM)], index=X.index)
+        return pd.concat([X, expanded_X], axis=1)
+
+
+def compute_cosine_sim(x: np.ndarray, y: np.ndarray) -> float:
+    mask = (np.isnan(x)) | (np.isnan(y))
+    if mask.sum() != 0:
+        return np.nan
+    return 1. - cosine_similarity(x.reshape(1, -1), y.reshape(1, -1))[0, 0]
+
+
+class CosineImputer(BaseEstimator, TransformerMixin):
+    """
+    A transformer for imputing missing values using KNN algorithm. It is a wrapper of the `KNNImputer` class from
+    `sklearn` used with a cosine_similarity metric to better adapt the high dimensional embeddings.
+    """
+
+    def __init__(self, /, n_neighbors: int, excluded_cols: list[str]) -> None:
         """
-        Create an embedding of a text. If `text` comes from a `pd.DataFrame`, it
-        ignores missing values.
 
         Args:
-            text (str | Any): The text to vectorize.
+            n_neighbors (int): The number of neighbors to for imputing.
+            excluded_cols (list[str]): The useless columns for the transformation. Should be all columns which
+                are not a part of embeddings.
 
         Returns:
-            np.ndarray | Any: The result of embedding if `text` is not a missing value
+            CosineImputer: A new instance of `CosineImputer`.
         """
-        if isinstance(text, str):
-            return np.mean(self.model_.encode(self._split_text(text), convert_to_numpy=True), axis=0)
-        return text
 
-
-class EmbeddingExpander(BaseEstimator, TransformerMixin):
-    """
-    A transformer to expand embedded columns passed into the `Vectorizer` transformer. If multiple columns
-    have been embedded, it expands them as `column_name_i` where `i` is the i-th dimension of the embedding.
-    """
-    def __init__(self, /, cols_to_expand: list[str] = []) -> None:
-        """
-        Create an `EmbeddingExpander` instance.
-
-        Args:
-            cols_to_expand (list[str], optional): The columns to expand. If the provided list is empty, the
-                dataframe will remain unchanged after the transformation. Defaults to [].
-
-        Returns:
-            `EmbeddingExpander`: A new instance of `EmbeddingExpander`.
-        """
         super().__init__()
-        self.cols_to_expand_: list[str] = cols_to_expand
-        self.output_shape_: tuple[int, int] = (0, 0)
+        self.excluded_cols_: list[str] = excluded_cols
+        self.used_cols_: list[str] = []
+        self.metric_ = lambda x, y, *, missing_values=np.nan: compute_cosine_sim(x, y)
+        self.imputer_: KNNImputer = KNNImputer(n_neighbors=n_neighbors, metric=self.metric_)
+        self.is_fitted_: bool = False
         return None
 
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingExpander:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> CosineImputer:
         """
-        Does nothing. Here for `sklearn` API compatibility only.
+        Fit the algorithm on the right columns.
 
         Args:
-            X (pd.DataFrame): The variables dataset.
-            y (Any, optional): The predictions dataset. Defaults to None.
+            X (pd.DataFrame): The dataframe containing the missing values.
+            y (Any, optional): Unused. Here for API consistency only.
 
         Returns:
-            EmbeddingExpander: The fitted transformer.
+            CosineImputer: The fitted transformer.
         """
+
+        self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
+        self.imputer_.fit(X[self.used_cols_], y)
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
         """
-        Expand the embedded columns provided by `cols_to_expand` attribute.
+        Transform the dataframe `X` using the fitted `CosineImputer`.
 
         Args:
             X (pd.DataFrame): The dataframe to transform.
 
         Returns:
-            pd.DataFrame: A new dataframe with expanded columns.
+            pd.DataFrame: The transformed dataframe without missing values.
         """
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        expanded_cols_names: dict[str, list[str]] = {col: [] for col in TEXTUAL_COLUMNS}
-        for i, col in enumerate(self.cols_to_expand_):
-            print(f"\r[EmbeddingExpander] - {i + 1}/{len(self.cols_to_expand_)}", end='')
 
-            expand_size = len(X_transformed[~X_transformed[col].isna()].reset_index()[col][0])
-            X_transformed[col] = X_transformed[col].fillna(str(np.zeros(expand_size)))
-            X_transformed[col] = X_transformed[col].apply(self._make_array_like)
-
-            expanded_cols_names[col] = [col + "_" + str(i + 1) for i in range(expand_size)]
-
-            vectors = np.stack([v for v in X_transformed[col]])
-            expand_df = pd.DataFrame(vectors, columns=expanded_cols_names[col], index=X.index)
-            X_transformed = pd.concat([X_transformed, expand_df], axis=1)
-            X_transformed[col + "_" + "norm"] = X_transformed[expanded_cols_names[col]].apply(lambda row: np.abs(row.astype('float').values).sum(), axis=1)
-
-        X_transformed = X_transformed.drop(columns=self.cols_to_expand_)
-        self.output_shape_ = X_transformed.shape
-
-        print(f"\r[EmbeddingExpander] - DONE    ")
-        return X_transformed
-
-    def _make_array_like(self, /, encoded_text: Any) -> Any:
-        if isinstance(encoded_text, str):
-            s = encoded_text.replace('\n', '').split('[')[-1].split(']')[0].split(' ')
-            s = [v for v in s if v != '']
-            return s
-        return encoded_text
+        try:
+            TPIPELOGGER.info(f"Imputing missing values ({"train" if not self.is_fitted_ else "test"} data)")
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            X_transformed[self.used_cols_] = self.imputer_.transform(X_transformed[self.used_cols_])
+            self.is_fitted_ = True
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingScaler : transform - {e}")
+            exit(1)
 
 
-class MissingEmbeddingFiller(BaseEstimator, TransformerMixin):
+class EmbeddingScaler(BaseEstimator, TransformerMixin):
     """
-    A transformer to fill missing values from the *description* column. It fills the missing values by
-    sampling from the distribution of existing values for each class.
+    A transformer to scale data. It can uses `StandardScaler`, `RobustScaler` or `MinMaxScaler` from the sklearn
+    preprocessing module.
     """
-    def __init__(self, /, mode: Literal["naive", "sampling"] = "naive") -> None:
+
+    def __init__(self, /, scaling: Literal["standard", "robust", "minmax"] = "standard", excluded_cols: list[str] = []) -> None:
         """
-        Create a `MissingEmbeddingFiller` instance.
+        Create an `EmbeddingScaler` instance.
 
         Args:
-            mode (Literal[&quot;naive&quot;, &quot;sampling&quot;], optional): The method of filling values.
-                If "naive", it will fill the missing descriptions with the corresponding titles. If "sampling",
-                it will draw a sample from the available descriptions of the corresponding class. Defaults
-                to "naive".
+            scaling (str): The type of scaling. "standard" for `StandardScaler`, "robust" for `RobustScaler`
+                or "minmax" for `MinMaxScaler`.
+            excluded_cols (list[str]): The columns to keep unchanged.
 
         Returns:
-            MissingEmbeddingFiller: A new `MissingEmbeddingFiller` instance.
+            EmbeddingScaler: A new instance of `EmbeddingScaler`.
         """
+
         super().__init__()
-        self.mode_: str = mode
+        self.scaling_type_: Literal["standard", "robust", "minmax"] = scaling
+        self.excluded_cols_: list[str] = excluded_cols
+        self.used_cols_: list[str] = []
+        self.is_fitted: bool = False
+        if scaling == "robust":
+            from sklearn.preprocessing import RobustScaler
+            self.scaler_ = RobustScaler()
+        elif scaling == "minmax":
+            from sklearn.preprocessing import MinMaxScaler
+            self.scaler_ = MinMaxScaler()
+        else:
+            from sklearn.preprocessing import StandardScaler
+            self.scaler_ = StandardScaler()
         return None
 
-    def fit(self, /, X: pd.DataFrame, y: Any = None) -> MissingEmbeddingFiller:
+    def fit(self, /, X: pd.DataFrame, y: Any = None) -> EmbeddingScaler:
         """
-        Does nothing. Here for `sklearn` API compatibility only.
+        Fit the scaler to the data. Must be used on the train set.
 
         Args:
-            X (pd.DataFrame): The variables dataset.
-            y (Any, optional): The predictions dataset. Defaults to None.
+            X (pd.DataFrame): The training variables dataset.
+            y (Any, optional): The training predictions dataset. Defaults to None.
 
         Returns:
-            MissingEmbeddingFiller: The fitted transformer.
+            EmbeddingScaler: The fitted transformer.
         """
+
+        self.used_cols_ = [col for col in X.columns if col not in self.excluded_cols_]
+        self.scaler_.fit(X[self.used_cols_], y)
         return self
 
     def transform(self, /, X: pd.DataFrame) -> pd.DataFrame:
-        print(f"\r[MissingEmbeddingFiller] ...", end='')
-        X_transformed: pd.DataFrame = X.copy(deep=True)
-        if self.mode_ == "naive":
-            X_transformed = self._naive_transform(X_transformed)
-        if self.mode_ == "sampling":
-            return X_transformed
-        print(f"\r[MissingEmbeddingFiller] - DONE")
-        return X_transformed
+        """
+        Scale the data using the given sklearn scaler. Does not apply on the `excluded_cols` columns.
 
-    def _naive_transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        description_cols = [col for col in X.columns if "description" in col]
-        description_cols.remove("description_norm")
-        designation_cols = [col for col in X.columns if "designation" in col]
-        designation_cols.remove("designation_norm")
-        for i in range(len(description_cols)):
-            X.loc[X["description_norm"] == 0, f"description_{i + 1}"] = X.loc[X["description_norm"] == 0, f"designation_{i + 1}"]
-        X.loc[X["description_norm"] == 0, "description_norm"] = X.loc[X["description_norm"] == 0, "designation_norm"]
-        return X
+        Args:
+            X (pd.DataFrame): The dataframe to scale.
+
+        Returns:
+            pd.DataFrame: The scaled dataframe.
+        """
+
+        TPIPELOGGER.info(f"Scaling embeddings ({"train" if not self.is_fitted else "test"} data)")
+        try:
+            X_transformed: pd.DataFrame = X.copy(deep=True)
+            X_transformed[self.used_cols_] = self.scaler_.transform(X_transformed[self.used_cols_])
+            self.is_fitted = True
+            return X_transformed
+        except Exception as e:
+            TPIPELOGGER.error(f"EmbeddingScaler : transform - {e}")
+            exit(1)

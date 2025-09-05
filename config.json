@@ -1,0 +1,142 @@
+{
+    "PREPROCESSING": {
+        "PATHS": {
+            "rawTextData": ".data/raw/X_train.csv",
+            "rawImageFolder": ".data/raw/images/",
+            "rawLabels": ".data/raw/Y_train.csv",
+            "cleanTextTrainData": ".data/clean/text_train.csv",
+            "cleanTextTestData": ".data/clean/text_test.csv",
+            "cleanImageTrainFolder": ".data/clean/image_train/",
+            "cleanImageTestFolder": ".data/clean/image_test/"
+        },
+        "PIPELINE": {
+            "sampleSize": 1000,
+            "trainSize": 0.7,
+            "randomState": 42,
+            "multithread": true,
+            "TEXTPIPELINE": {
+                "CONSTANTS": {
+                    "textualColumns": ["designation", "description"],
+                    "alphanumCharacters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                    "ponctuationCharacters": "!\"$%&'()+,-./:;?[]^_`|~ ",
+                    "accentCharacters": "àâäçéèêëîïôöùûüÿœæÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒÆ",
+                    "maxTokenVectorizer": 128,
+                    "embeddingDimension": 384
+                },
+                "STEPS": [
+                    {
+                        "stepName": "character_cleaning",
+                        "transformer": "CharacterCleaner",
+                        "params": {}
+                    },
+                    {
+                        "stepName": "text_embedding",
+                        "transformer": "Vectorizer",
+                        "params": {
+                            "model": "paraphrase-multilingual-MiniLM-L12-v2"
+                        }
+                    },
+                    {
+                        "stepName": "knn_imputing",
+                        "transformer": "CosineImputer",
+                        "params": {
+                            "n_neighbors": 10,
+                            "excluded_cols": ["productid", "imageid", "description", "designation"]}
+                    }
+                ],
+                "RESAMPLING": {
+                    "active": false,
+                    "params": {
+                        "strategy": "equal",
+                        "kNeighbors": 5,
+                        "randomState": 5
+                    }
+                }
+            },
+            "IMAGEPIPELINE": {
+                "CONSTANTS" : {
+                    "imageShape": [500, 500, 3],
+                    "batchSize": 32,
+                    "multithread": true
+                },
+                "STEPS": [
+                    {
+                        "stepName": "rotation",
+                        "transformer": "RandomImageRotation",
+                        "params": {
+                            "degree": 180,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "flip",
+                        "transformer": "RandomImageFlip",
+                        "params": {
+                            "horizontal": true,
+                            "vertical": true,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "crop",
+                        "transformer": "RandomImageCrop",
+                        "params": {
+                            "crop_window": [350, 450],
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "zoom",
+                        "transformer": "RandomImageZoom",
+                        "params": {
+                            "factor": 0.3,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "blur",
+                        "transformer": "RandomImageBlur",
+                        "params": {
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "noise",
+                        "transformer": "RandomImageNoise",
+                        "params": {
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "contrast",
+                        "transformer": "RandomImageContrast",
+                        "params": {
+                            "factor": 0.5,
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "coloration",
+                        "transformer": "RandomImageColoration",
+                        "params": {
+                            "p": 0.5
+                        }
+                    },
+                    {
+                        "stepName": "dropout",
+                        "transformer": "RandomImageDropout",
+                        "params": {
+                            "dropout": [0.0, 0.15],
+                            "p": 0.5
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "LOGS": {
+        "filePath": ".logs/{DATE}_",
+        "baseFormat": "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
+        "dateFormat": "%Y-%m-%d %H:%M:%S"
+    }
+}
