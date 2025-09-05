@@ -2,16 +2,17 @@ import sys
 import os
 import logging
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))  # pour trouver le module src/
 
-from src.config_loader import get_config
-from src.logger import build_logger
-from src.utils import timer
+from src.config_loader import get_config  # fonction pour récupérer les infos de config.json
+from src.logger import build_logger  # fonction pour construire un logger, utilise le fichier config.json
+from src.utils import timer  # décorateur pour timer l'exécution d'une fonction
 
 
-PREPROCESSING_CONFIG = get_config("PREPROCESSING")
-LOG_CONFIG = get_config("LOGS")
+PREPROCESSING_CONFIG = get_config("PREPROCESSING")  # charge le contenu de la config "PREPROCESSING"
+LOG_CONFIG = get_config("LOGS")  # charge le contenu de la config "LOGS"
 
+# création d'un logger pour la pipeline générale : écrit dans le fichier 'filepath' avec les formatages 'baseformat' et 'dateformat'
 PIPELOGGER = build_logger(name="pipeline",
                           filepath=LOG_CONFIG["filePath"],
                           baseformat=LOG_CONFIG["baseFormat"],
@@ -222,7 +223,7 @@ def pipe() -> None:
 
         .. performance_example::
 
-            - **RAM** : GSkill Trident Z 32Go
+            - **RAM** : 32Go
 
             - **CPU** : Intel i7 11700K
 

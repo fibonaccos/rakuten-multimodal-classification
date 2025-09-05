@@ -40,16 +40,8 @@
                         "stepName": "knn_imputing",
                         "transformer": "CosineImputer",
                         "params": {
-                            "n_neighbors": 5,
+                            "n_neighbors": 10,
                             "excluded_cols": ["productid", "imageid", "description", "designation"]}
-                    },
-                    {
-                        "stepName": "scaling",
-                        "transformer": "EmbeddingScaler",
-                        "params": {
-                            "scaling": "normal",
-                            "excluded_cols": ["productid", "imageid", "designation", "description"]
-                        }
                     }
                 ],
                 "RESAMPLING": {
@@ -97,7 +89,8 @@
                         "stepName": "zoom",
                         "transformer": "RandomImageZoom",
                         "params": {
-                            "factor": 0.3, "p": 0.5
+                            "factor": 0.3,
+                            "p": 0.5
                         }
                     },
                     {

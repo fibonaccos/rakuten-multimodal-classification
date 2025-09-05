@@ -27,8 +27,6 @@ import torch.nn as nn
 import kornia.augmentation as K
 import kornia.enhance as KE
 import kornia.color as KC
-import random
-from typing import Any
 
 
 __all__ = ["RandomImageRotation",
@@ -158,9 +156,10 @@ class RandomImageColoration(nn.Module):
 
 
 class RandomImageDropout(nn.Module):
-    def __init__(self, /, dropout: float, p: float) -> None:
+    def __init__(self, /, dropout: list[float], p: float) -> None:
         super().__init__()
-        self.dropper_ = K.RandomErasing(scale=(dropout, dropout), ratio=(1.0, 1.0), p=p)
+
+        self.dropper_ = K.RandomErasing(scale=(dropout[0], dropout[1]), ratio=(1.0, 1.0), p=p)
         return None
 
     def forward(self, /, x: torch.Tensor) -> torch.Tensor:
