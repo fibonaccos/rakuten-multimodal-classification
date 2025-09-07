@@ -19,21 +19,31 @@ TPIPELOGGER = build_logger(name="textual_pipeline_components",
                            level=logging.INFO)
 
 TPIPELOGGER.info("Running textual_pipeline_components.py")
-TPIPELOGGER.info("Resolving imports on textual_pipeline_components.py")
 
+TPIPELOGGER.info("Importing built-ins")
 
 from typing import Any, Literal
+import re
+
+TPIPELOGGER.info("Imorting sklearn components")
+
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import KNNImputer
 from sklearn.metrics.pairwise import cosine_similarity
+
+TPIPELOGGER.info("Importing beautifulsoup, numpy, pandas")
+
 from bs4 import BeautifulSoup
-from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
-import re
+
+TPIPELOGGER.info("Importing sentence_transformers")
+
+from sentence_transformers import SentenceTransformer
 
 
-__all__ = ["CharacterCleaner",
+__all__ = ["TPIPELOGGER",
+           "CharacterCleaner",
            "Vectorizer",
            "CosineImputer",
            "EmbeddingScaler"]
@@ -251,7 +261,7 @@ class Vectorizer(BaseEstimator, TransformerMixin):
 
         Returns:
             Any: If `text` is a missing value, returns a list of `None` values of length of embeddings. If
-                `text` is a str value, returns a `np.ndarray` of shape (*embedding_dim*, ).
+                `text` is a string value, returns a `np.ndarray` of shape (*embedding_dim*, ).
         """
 
         if not isinstance(text, str) or text.strip() == "":

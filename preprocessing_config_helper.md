@@ -7,7 +7,6 @@ Pour utiliser le fichier config.json dans un fichier python, il faut le charger 
 ```python
 import sys
 import os
-import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))  # pour trouver le module src/
 
@@ -44,15 +43,17 @@ Contient les chemins pour accéder aux données.
 - **cleanTextTestData**, ***str*** : chemin vers le dataset textuel de test préparé.
 - **cleanImageTrainFolder**, ***str*** : chemin vers le dossier d'images d'entraînement préparé.
 - **cleanImageTestFolder**, ***str*** : chemin vers le dossier d'images de test préparé.
+- **cleanTrainLabels**, ***str*** : chemin vers les labels d'entraînement joints aux ids du dataset d'entraînement.
+- **cleanTestLabels**, ***str*** : chemin vers les labels de test joints aux ids du dataset de test.
 
 ### Pipeline
 
 Contient les paramètres et méta-données nécessaires pour l'exécution des pipelines.
 
-- **sampleSize**, ***int*** : taille de l'échantillon à traiter.
-- **trainSize**, ***float***: pourcentage de l'échantillon à utiliser comme jeu d'entraînement.
-- **randomState**, ***int***: graine aléatoire générale pour la reproductibilité.
-- **multithread**, ***bool***: permet d'exécuter en parallèle les pipelines textuel et d'images.
+- **toPipe**, ***str*** : choix du pipeline ; "text" pour exécuter le pipeline textuel, "image" pour le pipeline image et "all" pour exécuter toutes les pipelines.
+- **sampleSize**, ***int*** : taille de l'échantillon à traiter. Si **sampleSize** $\small \le$ 0, toutes les données sont utilisées.
+- **trainSize**, ***float*** : pourcentage de l'échantillon à utiliser comme jeu d'entraînement.
+- **randomState**, ***int*** : graine aléatoire générale pour la reproductibilité.
 - **textpipeline** : contient les paramètres du pipeline textuel. Les caractères indiqués dans les champs **Characters* ont vocation à être utilisés au sein d'un transformer de nettoyage de caractères.
     - **constants** :
         - **textualColumns**, ***list[str]*** : noms des colonnes du dataset sujet au traitement.
@@ -64,16 +65,16 @@ Contient les paramètres et méta-données nécessaires pour l'exécution des pi
     - **steps** : étapes intégrées dans le pipeline textuel. L'ordre importe. Doit uniquement contenir des classes supportées par l'API scikit-learn : les classes doivent hériter de *BaseEstimator*, *TransformerMixin* et doivent implémenter les méthodes *fit* et *transform*. Chaque *step* contient :
         - **stepName**, ***str*** : le nom de l'étape. N'a aucun effet sur le traitement.
         - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée.
+        - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
 -  **imagepipeline** : contient les paramètres du pipeline d'images.
     - **constants** :
         - **imageShape**, ***list[int]*** : les dimensions des images, en convention *channel-last*.
-        - **batchSize**, ***int*** : taille des batchs pour le traitement par lots.
-        - **multithread**, ***bool*** : permet d'exécuter en parallèle certaines parties du pipeline (chargement, sauvegarde des images notamment).
-    - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *nn.Module* de la librairie *torch*, et doivent implémenter la méthode *forward*. Chaque *step* contient :
+        - **enableCuda**, ***bool*** : permet d'utiliser le GPU pour exécuter les transformations d'images. Nécessite un GPU compatible.
+        - **numThreads**, ***bool*** : nombre de threads à allouer pour le traitement CPU en parallèle.
+    - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *BaseImageTransform* et doivent implémenter la méthode $\,$*\_\_call\_\_* qui prend en paramètre une image sous forme de *torch.Tensor* et 2 générateurs *torch.Generator* (nécessaire au support CPU et GPU). Chaque *step* contient :
         - **stepName**, ***str*** : le nom de la transformation. Aucun effet sur le traitement.
         - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée.
+        - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
 
 ## Logs
 
@@ -113,11 +114,13 @@ On recense l'ensemble des classes implémentées pour le preprocessing.
 ### Transformations d'images
 
 - `RandomImageRotation(degree: float, p: float)` : Applique une rotation d'angle compris entre `-degree` et `degree` à une image avec probabilité `p`.
-- `RandomImageFlip(horizontal: bool, vertical: bool, p: float)` : Applique un retournement horizontal et/ou vertical à une image avec probabilité `p`.
-- `RandomImageCrop(crop_window: list[int], p: float)` : Applique un cropping à une image de taille `(crop_window[0], crop_window[1])` avec probabilité `p`.
-- `RandomImageZoom(factor: float, p: float)` : Applique un zoom/dezoom à une image d'intensité `1 + factor` avec probabilité `p`.
-- `RandomImageBlur(p: float)` : Applique un flou gaussien à une image avec probabilité `p`.
-- `RandomImageNoise(p: float)` : Applique un bruit blanc à une image avec probabilité `p`.
-- `RandomImageContrast(factor: float, p: float)` : Applique un contraste à une image de facteur `1 + factor` avec probabilité `p`.
-- `RandomImageColoration(p: float)` : Applique un mapping de couleur à une image avec probabilité `p`. Le mapping est choisi aléatoirement entre un mapping en nuance de gris, un mapping négatif, ou une permutation aléatoire des canaux.
-- `RandomImageDropout(dropout: list[float], p: float)` : Applique un dropout aléatoirement sur une image avec probabilité `p`. La zone de dropout couvre aléatoirement entre `100 * dropout[0]` et `100 * dropout[1]` % de l'image.
+- `RandomImageHFlip(p: float)` : Applique un retournement horizontal à une image avec probabilité `p`.
+- `RandomImageVFlip(p: float)` : Applique un retournement vertical à une image avec probabilité `p`.
+- `RandomImageCrop(min_scale: float, p: float)` : Applique un cropping à une image d'échelle supérieure à  `min_scale` avec probabilité `p`.
+- `RandomImageZoom(min_scale: float, max_scale: float, p: float)` : Applique un zoom/dezoom à une image d'intensité comprise entre `min_scale` et `max_scale` avec probabilité `p`.
+- `RandomImageBlur(max_kernel: int, p: float)` : Applique un flou gaussien de taille de noyau inférieur à `max_kernel` à une image avec probabilité `p`.
+- `RandomImageNoise(max_std: float, p: float)` : Applique un bruit blanc de dispersion inférieure à `max_std` à une image avec probabilité `p`.
+- `RandomImageContrast(min_factor: float, max_factor: float, p: float)` : Applique un contraste à une image d'un facteur compris entre `min_factor` et `max_factor` avec probabilité `p`.
+- `RandomImageColoration(p: float)` : Applique un mapping de couleur à une image avec probabilité `p`. Le mapping est choisi aléatoirement entre un mapping en nuance de gris, un mapping négatif, une permutation aléatoire des canaux, ou un mélange linéaire aléatoire des canaux.
+- `RandomImageDropout(min_area: float, max_area: float, p: float)` : Applique un dropout aléatoirement sur une image avec probabilité `p`. La zone de dropout couvre aléatoirement entre `100 * min_area` % et `100 * max_area` % de l'image.
+- `RandomImagePixelDropout(max_rate: float)` : Applique un dropout de pixels uniformément sur une image avec probabilité `p`. Le taux de pixels maximum éteints est donné par `max_rate`.

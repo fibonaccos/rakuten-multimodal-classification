@@ -2,7 +2,8 @@ import time
 from functools import wraps
 
 
-__all__ = ["timer"]
+__all__ = ["timer",
+           "format_duration"]
 
 
 def format_duration(duration):
