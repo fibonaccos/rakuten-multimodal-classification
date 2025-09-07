@@ -7,7 +7,6 @@ Pour utiliser le fichier config.json dans un fichier python, il faut le charger 
 ```python
 import sys
 import os
-import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))  # pour trouver le module src/
 
@@ -52,7 +51,7 @@ Contient les chemins pour accéder aux données.
 Contient les paramètres et méta-données nécessaires pour l'exécution des pipelines.
 
 - **toPipe**, ***str*** : choix du pipeline ; "text" pour exécuter le pipeline textuel, "image" pour le pipeline image et "all" pour exécuter toutes les pipelines.
-- **sampleSize**, ***int*** : taille de l'échantillon à traiter.
+- **sampleSize**, ***int*** : taille de l'échantillon à traiter. Si **sampleSize** $\small \le$ 0, toutes les données sont utilisées.
 - **trainSize**, ***float*** : pourcentage de l'échantillon à utiliser comme jeu d'entraînement.
 - **randomState**, ***int*** : graine aléatoire générale pour la reproductibilité.
 - **textpipeline** : contient les paramètres du pipeline textuel. Les caractères indiqués dans les champs **Characters* ont vocation à être utilisés au sein d'un transformer de nettoyage de caractères.
@@ -66,17 +65,16 @@ Contient les paramètres et méta-données nécessaires pour l'exécution des pi
     - **steps** : étapes intégrées dans le pipeline textuel. L'ordre importe. Doit uniquement contenir des classes supportées par l'API scikit-learn : les classes doivent hériter de *BaseEstimator*, *TransformerMixin* et doivent implémenter les méthodes *fit* et *transform*. Chaque *step* contient :
         - **stepName**, ***str*** : le nom de l'étape. N'a aucun effet sur le traitement.
         - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée.
+        - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
 -  **imagepipeline** : contient les paramètres du pipeline d'images.
     - **constants** :
         - **imageShape**, ***list[int]*** : les dimensions des images, en convention *channel-last*.
-        - **batchSize**, ***int*** : taille des batchs pour le traitement par lots.
-        - **enableCuda**, ***bool*** : permet d'utiliser le GPU pour le exécuter les transformations d'images. Nécessite un GPU compatible.
+        - **enableCuda**, ***bool*** : permet d'utiliser le GPU pour exécuter les transformations d'images. Nécessite un GPU compatible.
         - **numThreads**, ***bool*** : nombre de threads à allouer pour le traitement CPU en parallèle.
-    - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *nn.Module* de la librairie *torch*, et doivent implémenter la méthode *forward*. Chaque *step* contient :
+    - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *BaseImageTransform* et doivent implémenter la méthode $\,$*\_\_call\_\_* qui prend en paramètre une image sous forme de *torch.Tensor* et 2 générateurs *torch.Generator* (nécessaire au support CPU et GPU). Chaque *step* contient :
         - **stepName**, ***str*** : le nom de la transformation. Aucun effet sur le traitement.
         - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée.
+        - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
 
 ## Logs
 

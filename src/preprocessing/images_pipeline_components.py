@@ -89,7 +89,7 @@ def register_transform(cls):
     return cls
 
 
-class BaseTransform:
+class BaseImageTransform:
     def __init__(self, p: float = 1.0) -> None:
         self.p = float(p)
         return None
@@ -99,7 +99,7 @@ class BaseTransform:
 
 
 @register_transform
-class RandomImageRotation(BaseTransform):
+class RandomImageRotation(BaseImageTransform):
     def __init__(self, p: float = 0.5, degree: float = 180.0) -> None:
         super().__init__(p=p)
         self.degree = float(degree)
@@ -114,7 +114,7 @@ class RandomImageRotation(BaseTransform):
 
 
 @register_transform
-class RandomImageHFlip(BaseTransform):
+class RandomImageHFlip(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
 
@@ -125,7 +125,7 @@ class RandomImageHFlip(BaseTransform):
 
 
 @register_transform
-class RandomImageVFlip(BaseTransform):
+class RandomImageVFlip(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
 
@@ -136,7 +136,7 @@ class RandomImageVFlip(BaseTransform):
 
 
 @register_transform
-class RandomImageCrop(BaseTransform):
+class RandomImageCrop(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_scale: float = 0.6) -> None:
         super().__init__(p=p)
         self.min_scale = float(min_scale)
@@ -156,7 +156,7 @@ class RandomImageCrop(BaseTransform):
 
 
 @register_transform
-class RandomImageZoom(BaseTransform):
+class RandomImageZoom(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_scale: float = 0.8, max_scale: float = 1.2) -> None:
         super().__init__(p=p)
         self.min_scale = float(min_scale)
@@ -181,7 +181,7 @@ class RandomImageZoom(BaseTransform):
 
 
 @register_transform
-class RandomImageBlur(BaseTransform):
+class RandomImageBlur(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_kernel: int = 7) -> None:
         super().__init__(p=p)
         self.max_kernel = int(max_kernel)
@@ -200,7 +200,7 @@ class RandomImageBlur(BaseTransform):
 
 
 @register_transform
-class RandomImageNoise(BaseTransform):
+class RandomImageNoise(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_std: float = 0.1) -> None:
         super().__init__(p=p)
         self.max_std = float(max_std)
@@ -214,7 +214,7 @@ class RandomImageNoise(BaseTransform):
 
 
 @register_transform
-class RandomImageContrast(BaseTransform):
+class RandomImageContrast(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_factor: float = 0.6, max_factor: float = 1.4) -> None:
         super().__init__(p=p)
         self.min_factor = float(min_factor)
@@ -229,7 +229,7 @@ class RandomImageContrast(BaseTransform):
 
 
 @register_transform
-class RandomImageColoration(BaseTransform):
+class RandomImageColoration(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
 
@@ -256,7 +256,7 @@ class RandomImageColoration(BaseTransform):
 
 
 @register_transform
-class RandomImageDropout(BaseTransform):
+class RandomImageDropout(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_area: float = 0.02, max_area: float = 0.2) -> None:
         super().__init__(p=p)
         self.min_area = float(min_area)
@@ -280,7 +280,7 @@ class RandomImageDropout(BaseTransform):
 
 
 @register_transform
-class RandomImagePixelDropout(BaseTransform):
+class RandomImagePixelDropout(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_rate: float = 0.1) -> None:
         super().__init__(p=p)
         self.max_rate = float(max_rate)
@@ -294,7 +294,7 @@ class RandomImagePixelDropout(BaseTransform):
 
 
 class AugmentationPipeline:
-    def __init__(self, transforms: List[BaseTransform], device: str) -> None:
+    def __init__(self, transforms: List[BaseImageTransform], device: str) -> None:
         self.transforms = transforms
         self.device: str = device
         dummy = torch.rand(3, 64, 64, device=device)
