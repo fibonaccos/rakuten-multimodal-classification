@@ -6,13 +6,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 
 from src.config_loader import get_config  # fonction pour récupérer les infos de config.json
 from src.logger import build_logger  # fonction pour construire un logger, utilise le fichier config.json
-from src.utils import timer  # décorateur pour timer l'exécution d'une fonction
+from src.utils import timer, format_duration  # décorateur pour timer l'exécution d'une fonction
 
 
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")  # charge le contenu de la config "PREPROCESSING"
 LOG_CONFIG = get_config("LOGS")  # charge le contenu de la config "LOGS"
 
-# création d'un logger pour la pipeline générale : écrit dans le fichier 'filepath' avec les formatages 'baseformat' et 'dateformat'
+# création d'un logger pour le pipeline générale : écrit dans le fichier 'filepath' avec les formatages 'baseformat' et 'dateformat'
 PIPELOGGER = build_logger(name="pipeline",
                           filepath=LOG_CONFIG["filePath"],
                           baseformat=LOG_CONFIG["baseFormat"],
@@ -23,16 +23,10 @@ PIPELOGGER.info("Running main_pipeline.py")
 PIPELOGGER.info("Resolving imports on main_pipeline.py")
 
 
-from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
-from typing import Any
-from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Literal
 import pandas as pd
-import images_pipeline_components as ipipe
-import textual_pipeline_components as tpipe
-import torch
-import torchvision.io as io
-import kornia.augmentation as K
+import time
 
 
 def split_data() -> tuple:
@@ -42,30 +36,38 @@ def split_data() -> tuple:
 
     Returns:
         tuple: A tuple given by `(X_train, X_test, y_train, y_test, image_train, image_test)` where `image_train`
-            `image_test` are lists of image names.
+            and `image_test` are lists of image names.
     """
 
-    if PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"] <= 0:
+    sample_size: int = PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"]
+    if sample_size <= 0:
         X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
         y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
     else:
-        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
-        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"])
+        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=sample_size)
+        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=sample_size)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y,
                                                         stratify=y,
                                                         train_size=PREPROCESSING_CONFIG["PIPELINE"]["trainSize"],
                                                         random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
 
-    image_train: list[str] = [PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"] + "/" + "image_" + str(image_id) + "product_" + str(product_id) + ".jpg"
+    image_train: list[str] = [PREPROCESSING_CONFIG["PATHS"]["rawImageFolder"] + "image_" + str(image_id) + "_product_" + str(product_id) + ".jpg"
                               for image_id, product_id in zip(X_train["imageid"].values, X_train["productid"].values)]
 
-    image_test: list[str] = [PREPROCESSING_CONFIG["PATHS"]["cleanImageTestFolder"] + "/" + "image_" + str(image_id) + "product_" + str(product_id) + ".jpg"
+    image_test: list[str] = [PREPROCESSING_CONFIG["PATHS"]["rawImageFolder"] + "image_" + str(image_id) + "_product_" + str(product_id) + ".jpg"
                               for image_id, product_id in zip(X_test["imageid"].values, X_test["productid"].values)]
+
+    y_train_image = pd.concat([X_train[["productid"]], X_train[["imageid"]], y_train], axis=1)
+    y_test_image = pd.concat([X_test[["productid"]], X_test[["imageid"]], y_test], axis=1)
+
+    y_train_image.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTrainLabels"], index=False, header=True)
+    y_test_image.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTestLabels"], index=False, header=True)
 
     return X_train, X_test, y_train, y_test, image_train, image_test
 
 
+@timer
 def text_pipe(X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.DataFrame, y_test: pd.DataFrame) -> None:
     """
     Execute the text preprocessing pipeline using metadata from `config.json` file.
@@ -80,168 +82,165 @@ def text_pipe(X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.DataFrame
         None:
     """
 
-    PIPELOGGER.info("Running text_pipe")
+    PIPELOGGER.info("Importing textual_pipeline_components.py")
+    import textual_pipeline_components as tpipe
+
+    PIPELOGGER.info("Importing sklearn components")
+    from sklearn.pipeline import Pipeline
+
+    PIPELOGGER.info("Modules imported, launching text_pipe")
+
+
+    TPIPELOGGER = tpipe.TPIPELOGGER
+
+    real_start_text = time.time()
+
+    TPIPELOGGER.info("Running textual pipeline")
 
     pipeline_steps: list[tuple[str, Any]] = [(step["stepName"], getattr(tpipe, step["transformer"])(**step["params"]))
                                              for step in PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["STEPS"]]
 
     pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
 
-    PIPELOGGER.info("Processing textual train data")
+    TPIPELOGGER.info("Processing textual train data")
     clean_X_train = pipe.fit_transform(X_train, y_train)
 
-    PIPELOGGER.info("Processing textual test data")
+    TPIPELOGGER.info("Processing textual test data")
     clean_X_test = pipe.transform(X_test)
 
-    if PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["RESAMPLING"]["active"]:
-        PIPELOGGER.info("Resampling textual train data")
-        clean_X_train, y_train = tpipe.LabelResampler().fit_resample(pd.DataFrame(clean_X_train), pd.DataFrame(y_train))  # type: ignore
-
     clean_train = pd.DataFrame(clean_X_train)
-    clean_train = pd.concat([clean_train, y_train], axis=1).rename(columns={'prdtypecode': 'labels'})
     clean_test = pd.DataFrame(clean_X_test)
-    clean_test = pd.concat([clean_test, y_test], axis=1).rename(columns={'prdtypecode': 'labels'})
 
-    PIPELOGGER.info("Saving textual train data")
-    clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False)
-    PIPELOGGER.info("Saving textual test data")
-    clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False)
+    TPIPELOGGER.info("Saving textual train data")
+    clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False, header=True)
 
-    PIPELOGGER.info("text_pipe completed")
+    TPIPELOGGER.info("Saving textual test data")
+    clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False, header=True)
+
+    real_end_text = time.time()
+
+    TPIPELOGGER.info(f"Textual pipeline finished in {format_duration(real_end_text - real_start_text)}")
     return None
 
 
+@timer
 def image_pipe(train: list[str], test: list[str]) -> None:
     """
-    Execute the image preprocessing pipeline using metadata from `config.json` file.
+    Execute the image preprocessing pipeline using metadata from `config.json` file. If
+    *numThreads* > 1, then CPU multithreading will be enabled with the chosen number of
+    threads.
 
     Args:
-        train (list[str]): The training image names
-        test (list[str]): The testing image names
+        train (list[str]): The training image names.
+        test (list[str]): The testing image names.
 
     Returns:
         None:
     """
 
-    PIPELOGGER.info("Running image_pipe")
+    PIPELOGGER.info("Importing image_pipeline_components.py")
+    import images_pipeline_components as ipipe
+
+    PIPELOGGER.info("Importing torch")
+    import torch
+
+    PIPELOGGER.info("Modules imported, launching image_pipe")
+
+
+    IPIPELOGGER = ipipe.IPIPELOGGER
+
+    real_start_image = time.time()
+
+    IPIPELOGGER.info("Starting image pipeline")
 
     os.makedirs(PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"], exist_ok=True)
     os.makedirs(PREPROCESSING_CONFIG["PATHS"]["cleanImageTestFolder"], exist_ok=True)
 
-    if not torch.cuda.is_available():
-        PIPELOGGER.warning("The cuda device is not available. Processing will run on CPU only " \
-                           "which may highly lower the performances.")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = ""
+    if PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["enableCuda"]:
+        if torch.cuda.is_available():
+            device = "cuda"
+        else:
+            IPIPELOGGER.warning("You enabled GPU usage but it is not available for torch, thus " \
+                                "image augmentations will run on CPU, which may highly increase "
+                                "execution time.")
+            device = "cpu"
+    else:
+        IPIPELOGGER.warning("GPU usage is disabled, thus image augmentations will run on CPU, " \
+                            "which may highly increase execution time. Consider enabling the GPU " \
+                            "usage if compatible.")
+        device = "cpu"
 
-    steps = [getattr(ipipe, step["transformer"])(**step["params"])
-             for step in PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]]
-    img_pipe = K.AugmentationSequential(*steps, data_keys=["input"]).to(device)
+    transformations = [getattr(ipipe, step["transformer"])(**step["params"])
+                       for step in PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]]
 
+    IPIPELOGGER.info("Building augmentations")
+    augmentation_pipe = ipipe.AugmentationPipeline(transforms=transformations, device=device)
 
-    def load_image(path) -> torch.Tensor:
-        """
-        Load and normalize an image.
+    for step in PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]:
+        IPIPELOGGER.info(f"Augmentation available : {step["transformer"]}")
 
-        Args:
-            path (_type_): The path to the image.
+    IPIPELOGGER.info("Running augmentations on images")
+    augmentation_pipe.run(image_list=train,
+                          out_dir=PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"],
+                          global_seed=PREPROCESSING_CONFIG["PIPELINE"]["randomState"],
+                          max_workers=PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["numThreads"])
 
-        Returns:
-            Tensor: A tensor representation of the image.
-        """
-
-        img = io.read_image(path)
-        img = img.float() / 255.0
-        return img
-
-
-    def save_image(tensor, path) -> None:
-        """
-        Save a processed image from a tensor.
-
-        Args:
-            tensor (_type_): The image to save as a tensor.
-            path (_type_): The path where to save the image.
-
-        Returns:
-            None:
-        """
-
-        img = (tensor.clamp(0, 1) * 255).byte().cpu()
-        io.write_png(img, path)
-        return None
-
-    def process_batch(batch_paths: list[str]) -> None:
-        """
-        Transform images using batches.
-
-        Args:
-            batch_paths (list[str]): A list of image paths representing the batch.
-
-        Returns:
-            None:
-        """
-
-        imgs = [load_image(p) for p in batch_paths]
-        batch = torch.stack(imgs).to(device)
-
-        params_list = []
-        for p, img in zip(batch_paths, batch):
-            seed = (PREPROCESSING_CONFIG["PIPELINE"]["randomState"] + 1 + abs(hash(os.path.basename(p)))) % 2**32
-            torch.manual_seed(seed)
-            params = img_pipe.forward_parameters(img.unsqueeze(0).shape)
-            params_list.append(params)
-        batch_params = {}
-        for k in params_list[0].keys():
-            batch_params[k] = torch.cat([p[k] for p in params_list], dim=0)
-
-        with torch.no_grad():
-            out = img_pipe(batch, params=batch_params)
-
-        with ThreadPoolExecutor() as executor:
-            for i, p in enumerate(batch_paths):
-                dst_path = os.path.join(PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"], os.path.basename(p))
-                executor.submit(save_image, out[i], dst_path)
-        return None
-
-    batch_size: int = PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["batchSize"]
-    for i in range(0, len(train), batch_size):
-        process_batch(train[i:i + batch_size])
-
-    PIPELOGGER.info("image_pipe completed")
+    real_end_image = time.time()
+    IPIPELOGGER.info(f"Image pipeline finished in {format_duration(real_end_image - real_start_image)}")
     return None
 
 
 @timer
-def pipe() -> None:
+def pipe(to_pipe: Literal["text", "image", "all"]) -> None:
     """
     The main preprocessing pipeline. It uses the metadata from the `config.json` file.
-
     It is composed of two separated pipelines respectively processing textual and images
-    datasets. They can be ran in parallel (use the key `multithread` in config file).
-    The image pipeline can also use multithreading if allowed in the config file. It
-    is recommanded to allow multithreading for improve execution time.
+    datasets. The image pipeline supports multithreading if enabled in the config file
+    (*numThreads* > 1), which is recommanded to improve execution time.
 
         .. performance_example::
+            - **numThreads** : 16
 
             - **RAM** : 32Go
 
             - **CPU** : Intel i7 11700K
 
             - **GPU** : Nvidia RTX 3080 10Go
-            **Total time** : -.
+            **Total time** : - .
     """
+
+    real_start = time.time()
 
     PIPELOGGER.info("Starting main pipeline")
     PIPELOGGER.info("Splitting data")
 
     X_train, X_test, y_train, y_test, image_train, image_test = split_data()
 
-    PIPELOGGER.info("Running pipelines")
-    text_pipe(X_train, X_test, y_train, y_test)
-    #image_pipe(image_train, image_test)
+    if to_pipe == "text":
+        PIPELOGGER.info("Selected pipeline(s) : 'text'")
+        PIPELOGGER.warning("Images dataset will not be processed with the chosen configuration. Change paramater to " \
+                           "'image' or 'all' to enable image processing.")
+        PIPELOGGER.info("Launching textual pipeline")
+        text_pipe(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+    elif to_pipe == "image":
+        PIPELOGGER.info("Selected pipeline(s) : 'image'")
+        PIPELOGGER.warning("Textual dataset will not be processed with the chosen configuration. Change paramater to " \
+                           "'text' or 'all' to enable text processing.")
+        PIPELOGGER.info("Launching image pipeline")
+        image_pipe(image_train, image_test)
+    else:
+        PIPELOGGER.info("Selected pipeline(s) : 'text', 'image'")
 
-    PIPELOGGER.info("pipe completed")
+        PIPELOGGER.info("Launching textual pipeline")
+        text_pipe(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+
+        PIPELOGGER.info("Launching image pipeline")
+        image_pipe(image_train, image_test)
+
+    real_end = time.time()
+    PIPELOGGER.info(f"Main pipeline finished in {format_duration(real_end - real_start)}")
     return None
 
 
-pipe()
+pipe(PREPROCESSING_CONFIG["PIPELINE"]["toPipe"])

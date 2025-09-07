@@ -10,157 +10,332 @@ from src.config_loader import get_config
 from src.logger import build_logger
 
 
-PREPROCESSING_CONFIG = get_config("PREPROCESSING")["PIPELINE"]["IMAGEPIPELINE"]
+PREPROCESSING_CONFIG = get_config("PREPROCESSING")
 LOG_CONFIG = get_config("LOGS")
-IPIPELOGGER = build_logger(name="image_pipeline_components",
+IPIPELOGGER = build_logger(name="images_pipeline_components",
                            filepath=LOG_CONFIG["filePath"],
                            baseformat=LOG_CONFIG["baseFormat"],
                            dateformat=LOG_CONFIG["dateFormat"],
                            level=logging.INFO)
 
-IPIPELOGGER.info("Running image_pipeline_components.py")
-IPIPELOGGER.info("Resolving imports on image_pipeline_components.py")
+IPIPELOGGER.info("Running images_pipeline_components.py")
 
+IPIPELOGGER.info("Importing built-ins, PIL, rich")
 
+import os
+import hashlib
+from typing import List
+from PIL import Image
+from rich.console import Console
+from rich.progress import Progress
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+IPIPELOGGER.info("Importing numpy, torch, kornia")
+
+import numpy as np
 import torch
-import torch.nn as nn
-import kornia.augmentation as K
-import kornia.enhance as KE
-import kornia.color as KC
+import kornia
+import kornia.filters as Kfilters
 
 
-__all__ = ["RandomImageRotation",
-           "RandomImageFlip",
+__all__ = ["IPIPELOGGER",
+           "TRANSFORM_REGISTRY",
+           "RandomImageRotation",
+           "RandomImageHFlip",
+           "RandomImageVFlip",
            "RandomImageCrop",
            "RandomImageZoom",
            "RandomImageBlur",
            "RandomImageNoise",
            "RandomImageContrast",
            "RandomImageColoration",
-           "RandomImageDropout"]
+           "RandomImageDropout",
+           "RandomImagePixelDropout",
+           "stable_seed_from",
+           "load_image_to_tensor",
+           "save_tensor_to_image",
+           "AugmentationPipeline"]
 
 
-class RandomImageRotation(nn.Module):
-    def __init__(self, /, degree: float, p: float) -> None:
-        super().__init__()
-        self.rotator_ = K.RandomRotation(degrees=degree, p=p)
+TRANSFORM_REGISTRY = {}
+
+
+# utilitaires
+def stable_seed_from(global_seed: int, filename: str) -> int:
+    h = hashlib.sha256(filename.encode("utf-8")).digest()
+    name_int = int.from_bytes(h[:8], "big", signed=False)
+    return (global_seed ^ name_int) & ((1 << 63) - 1)
+
+
+def load_image_to_tensor(path: str, device: str) -> torch.Tensor:
+    imshape = PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["imageShape"][:2]
+    img = Image.open(path).convert("RGB")
+    if img.size != (imshape[1], imshape[0]):
+        resample = Image.Resampling.BILINEAR
+        img = img.resize((imshape[1], imshape[0]), resample=resample)
+    arr = np.array(img).astype(np.float32) / 255.0
+    t = torch.from_numpy(arr).permute(2, 0, 1).to(device)
+    return t
+
+
+def save_tensor_to_image(tensor: torch.Tensor, out_path: str):
+    t = tensor.detach().cpu().clamp(0.0, 1.0)
+    nd = (t.numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+    Image.fromarray(nd).save(out_path)
+
+
+def register_transform(cls):
+    TRANSFORM_REGISTRY[cls.__name__] = cls
+    return cls
+
+
+class BaseTransform:
+    def __init__(self, p: float = 1.0) -> None:
+        self.p = float(p)
         return None
 
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        return self.rotator_(x)
+    def __call__(self, img: torch.Tensor, gen_cpu: torch.Generator, gen_cuda: torch.Generator) -> torch.Tensor:
+        raise NotImplementedError
 
 
-class RandomImageFlip(nn.Module):
-    def __init__(self, /, horizontal: bool, vertical: bool, p: float) -> None:
-        super().__init__()
-        self.hflip_: bool = horizontal
-        self.vflip_: bool = vertical
-        self.hflipper_ = K.RandomHorizontalFlip(p=p)
-        self.vflipper_ = K.RandomVerticalFlip(p=p)
+@register_transform
+class RandomImageRotation(BaseTransform):
+    def __init__(self, p: float = 0.5, degree: float = 180.0) -> None:
+        super().__init__(p=p)
+        self.degree = float(degree)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        angle = (torch.rand(1, generator=gen_cpu).item() * 2 - 1) * self.degree
+        inp = img.unsqueeze(0)
+        out = kornia.geometry.transform.rotate(inp, torch.tensor([angle], device=inp.device))
+        return out.squeeze(0)
+
+
+@register_transform
+class RandomImageHFlip(BaseTransform):
+    def __init__(self, p: float = 0.5) -> None:
+        super().__init__(p=p)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        return torch.flip(img, dims=[2])
+
+
+@register_transform
+class RandomImageVFlip(BaseTransform):
+    def __init__(self, p: float = 0.5) -> None:
+        super().__init__(p=p)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        return torch.flip(img, dims=[1])
+
+
+@register_transform
+class RandomImageCrop(BaseTransform):
+    def __init__(self, p: float = 0.5, min_scale: float = 0.6) -> None:
+        super().__init__(p=p)
+        self.min_scale = float(min_scale)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        C, H, W = img.shape
+        scale = torch.rand(1, generator=gen_cpu).item() * (1.0 - self.min_scale) + self.min_scale
+        new_h = int(round(H * scale)); new_w = int(round(W * scale))
+        max_y = H - new_h; max_x = W - new_w
+        y = int(torch.randint(0, max_y + 1, (1,), generator=gen_cpu).item())
+        x = int(torch.randint(0, max_x + 1, (1,), generator=gen_cpu).item())
+        cropped = img[:, y:y+new_h, x:x+new_w].unsqueeze(0)
+        resized = kornia.geometry.transform.resize(cropped, (H, W))[0]
+        return resized
+
+
+@register_transform
+class RandomImageZoom(BaseTransform):
+    def __init__(self, p: float = 0.5, min_scale: float = 0.8, max_scale: float = 1.2) -> None:
+        super().__init__(p=p)
+        self.min_scale = float(min_scale)
+        self.max_scale = float(max_scale)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        C, H, W = img.shape
+        scale = torch.rand(1, generator=gen_cpu).item() * (self.max_scale - self.min_scale) + self.min_scale
+        new_h = max(1, int(round(H * scale))); new_w = max(1, int(round(W * scale)))
+        resized = kornia.geometry.transform.resize(img.unsqueeze(0), (new_h, new_w))[0]
+        if scale >= 1.0:
+            top = (new_h - H) // 2; left = (new_w - W) // 2
+            out = resized[:, top:top+H, left:left+W]
+        else:
+            pad_h = H - new_h; pad_w = W - new_w
+            pad_top = pad_h // 2; pad_bottom = pad_h - pad_top
+            pad_left = pad_w // 2; pad_right = pad_w - pad_left
+            out = torch.nn.functional.pad(resized, (pad_left, pad_right, pad_top, pad_bottom))
+        return out
+
+
+@register_transform
+class RandomImageBlur(BaseTransform):
+    def __init__(self, p: float = 0.5, max_kernel: int = 7) -> None:
+        super().__init__(p=p)
+        self.max_kernel = int(max_kernel)
+        if self.max_kernel % 2 == 0:
+            self.max_kernel += 1
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        choices = list(range(1, self.max_kernel+1, 2))
+        idx = int(torch.randint(0, len(choices), (1,), generator=gen_cpu).item())
+        k = choices[idx]
+        sigma = float(torch.rand(1, generator=gen_cpu).item()) * 2.0
+        out = Kfilters.gaussian_blur2d(img.unsqueeze(0), (k, k), (sigma, sigma))
+        return out.squeeze(0)
+
+
+@register_transform
+class RandomImageNoise(BaseTransform):
+    def __init__(self, p: float = 0.5, max_std: float = 0.1) -> None:
+        super().__init__(p=p)
+        self.max_std = float(max_std)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        std = float(torch.rand(1, generator=gen_cpu).item() * self.max_std)
+        noise = torch.randn(img.shape, generator=gen_cuda, device=img.device, dtype=img.dtype) * std
+        return img + noise
+
+
+@register_transform
+class RandomImageContrast(BaseTransform):
+    def __init__(self, p: float = 0.5, min_factor: float = 0.6, max_factor: float = 1.4) -> None:
+        super().__init__(p=p)
+        self.min_factor = float(min_factor)
+        self.max_factor = float(max_factor)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        factor = torch.rand(1, generator=gen_cpu).item() * (self.max_factor - self.min_factor) + self.min_factor
+        mean = img.mean(dim=[1,2], keepdim=True)
+        return (img - mean) * factor + mean
+
+
+@register_transform
+class RandomImageColoration(BaseTransform):
+    def __init__(self, p: float = 0.5) -> None:
+        super().__init__(p=p)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        choice = int(torch.randint(0, 4, (1,), generator=gen_cpu).item())
+        if choice == 0:
+            return 1.0 - img
+        elif choice == 1:
+            g = kornia.color.rgb_to_grayscale(img.unsqueeze(0))[0]
+            return g.repeat(3, 1, 1)
+        elif choice == 2:
+            perm = torch.randperm(3, generator=gen_cpu).cpu().tolist()
+            return img[perm, :, :]
+        else:
+            mat = torch.rand(3, 3, generator=gen_cuda, device=img.device)
+            flat = img.reshape(3, -1)
+            mixed = mat @ flat
+            norm = mat.sum(dim=1, keepdim=True) + 1e-6
+            mixed = (mixed / norm)
+            mixed = mixed.reshape_as(img)
+            return mixed
+
+
+@register_transform
+class RandomImageDropout(BaseTransform):
+    def __init__(self, p: float = 0.5, min_area: float = 0.02, max_area: float = 0.2) -> None:
+        super().__init__(p=p)
+        self.min_area = float(min_area)
+        self.max_area = float(max_area)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        C, H, W = img.shape
+        area = torch.rand(1, generator=gen_cpu).item() * (self.max_area - self.min_area) + self.min_area
+        rect_area = int(area * H * W)
+        w = int(torch.randint(1, W+1, (1,), generator=gen_cpu).item())
+        h = max(1, rect_area // w)
+        if h > H:
+            h = H
+        x = int(torch.randint(0, max(1, W - w + 1), (1,), generator=gen_cpu).item())
+        y = int(torch.randint(0, max(1, H - h + 1), (1,), generator=gen_cpu).item())
+        out = img.clone()
+        out[:, y:y+h, x:x+w] = 0.0
+        return out
+
+
+@register_transform
+class RandomImagePixelDropout(BaseTransform):
+    def __init__(self, p: float = 0.5, max_rate: float = 0.1) -> None:
+        super().__init__(p=p)
+        self.max_rate = float(max_rate)
+
+    def __call__(self, img, gen_cpu, gen_cuda):
+        if torch.rand(1, generator=gen_cpu).item() > self.p:
+            return img
+        rate = torch.rand(1, generator=gen_cpu).item() * self.max_rate
+        mask = torch.bernoulli(torch.ones_like(img) * (1.0 - rate), generator=gen_cuda)
+        return img * mask
+
+
+class AugmentationPipeline:
+    def __init__(self, transforms: List[BaseTransform], device: str) -> None:
+        self.transforms = transforms
+        self.device: str = device
+        dummy = torch.rand(3, 64, 64, device=device)
+        gen_cpu = torch.Generator(device="cpu").manual_seed(0)
+        gen_cuda = torch.Generator(device=device if device != "cpu" else "cpu").manual_seed(0)
+        for t in self.transforms:
+            _ = t(dummy.clone(), gen_cpu, gen_cuda)
+        torch.cuda.synchronize() if device != "cpu" else None
         return None
 
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        transf = []
-        indices = torch.randperm(2)
-        if self.hflip_:
-            transf.append(self.hflipper_)
-        if self.vflip_:
-            transf.append(self.vflipper_)
-        for i in indices:
-            x = transf[i](x)
-        return x
+    def process_image(self, path_in: str, path_out: str, global_seed: int) -> None:
+        seed = stable_seed_from(global_seed, os.path.basename(path_in))
+        
+        gen_cpu = torch.Generator(device="cpu").manual_seed(int(seed))
+        gen_cuda = torch.Generator(device=self.device if self.device != "cpu" else "cpu").manual_seed(int(seed))
 
+        n = len(self.transforms)
+        if n > 0:
+            perm = torch.randperm(n, generator=gen_cpu).tolist()
+            transforms_ordered = [self.transforms[i] for i in perm]
+        else:
+            transforms_ordered = []
 
-class RandomImageCrop(nn.Module):
-    def __init__(self, /, crop_window: list[int], p: float) -> None:
-        super().__init__()
-        crop_values = torch.randint(crop_window[0], crop_window[1] + 1, (2, )).tolist()
-        self.croper_ = K.RandomCrop(size=(crop_values[0], crop_values[1]), p=p)
+        img = load_image_to_tensor(path_in, device=self.device).float()
+        out = img
+        for t in transforms_ordered:
+            out = t(out, gen_cpu, gen_cuda)
+
+        save_tensor_to_image(out, path_out)
         return None
 
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        return self.croper_(x)
-
-
-class RandomImageZoom(nn.Module):
-    def __init__(self, /, factor: float, p: float) -> None:
-        super().__init__()
-        scale1, scale2 = torch.empty(2).uniform_(-factor, factor).tolist()
-        self.zoomer_ = K.RandomResizedCrop(
-            size=tuple(PREPROCESSING_CONFIG["CONSTANTS"]["imageShape"][:2]),
-            scale=(1 + scale1, 1 + scale2), ratio=(1., 1.), p=p)
+    def run(self, image_list: List[str], out_dir: str, global_seed: int, max_workers: int) -> None:
+        console = Console()
+        with Progress(console=console) as progress:
+            task = progress.add_task("[white]Image augmentation ", total=len(image_list))
+            futures = []
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for path in image_list:
+                    out_path = os.path.join(out_dir, os.path.basename(path))
+                    futures.append(executor.submit(self.process_image, path, out_path, global_seed))
+                for f in as_completed(futures):
+                    f.result()
+                    progress.update(task, advance=1)
         return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        return self.zoomer_(x)
-
-
-class RandomImageBlur(nn.Module):
-    def __init__(self, /, p: float) -> None:
-        super().__init__()
-        sigma1, sigma2 = torch.empty(2).uniform_(0.5, 1.5).tolist()
-        self.blurrer_ = K.RandomGaussianBlur(kernel_size=(3, 3), sigma=(sigma1, sigma2), p=p)
-        self.p_: float = p
-        return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        return self.blurrer_(x)
-
-
-class RandomImageNoise(nn.Module):
-    def __init__(self, /, p: float) -> None:
-        super().__init__()
-        self.std_: float = torch.empty(1).uniform_(0.5, 1.5).item()
-        self.p_: float = p
-        return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if torch.rand() < self.p_:
-            noise = torch.randn_like(x) * self.std_
-            x = torch.clamp(x + noise, 0, 1)
-        return x
-
-
-class RandomImageContrast(nn.Module):
-    def __init__(self, /, factor: float, p: float) -> None:
-        super().__init__()
-        self.p_: float = p
-        self.factor_: float = torch.empty(1).uniform_(1 - factor, 1 + factor).item()
-        return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if torch.rand() < self.p_:
-            x = KE.adjust_contrast(x, self.factor_)
-        return x
-
-
-class RandomImageColoration(nn.Module):
-    def __init__(self, /, p: float) -> None:
-        super().__init__()
-        self.p_: float = p
-        return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        if torch.rand(1) < self.p_:
-            i = torch.randint(0, 3, (1,))
-            choice = ["invert", "grayscale", "permute"][i]
-            if choice == "invert":
-                x = 1.0 - x
-            if choice == "grayscale":
-                x = KC.rgb_to_grayscale(x)
-                x = KC.grayscale_to_rgb(x)
-            if choice == "permute":
-                perm = torch.randperm(3)
-                x = x[:, perm, :, :]
-        return x
-
-
-class RandomImageDropout(nn.Module):
-    def __init__(self, /, dropout: list[float], p: float) -> None:
-        super().__init__()
-
-        self.dropper_ = K.RandomErasing(scale=(dropout[0], dropout[1]), ratio=(1.0, 1.0), p=p)
-        return None
-
-    def forward(self, /, x: torch.Tensor) -> torch.Tensor:
-        return self.dropper_(x)
