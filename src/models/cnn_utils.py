@@ -24,8 +24,10 @@ import re
 import shutil
 import time
 import pandas as pd
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.progress import Progress
+from rich.live import Live
 from typing import Any
 
 
@@ -33,19 +35,20 @@ __all__ = ["make_CNN_dataset"]
 
 
 @timer
-def make_CNN_dataset(df_labels_path: str, src_train: str, src_test: str, dst_root: str, max_workers: int) -> None:
+def make_CNN_dataset(df_train: str, df_test: str, src_train: str, src_test: str, dst_root: str, max_workers: int) -> None:
     start_time = time.time()
     global cnnlogger
-    cnnlogger.info("Reading labels csv linker")
-    df = pd.read_csv(df_labels_path)
+    cnnlogger.info("Reading train and test labels")
+    dftr = pd.read_csv(df_train)
+    dfte = pd.read_csv(df_test)
     cnnlogger.info("Making tensorflow-like dataset for CNN")
-    cnn_distribute_images(df, src_train=src_train, src_test=src_test, dst_root=dst_root, max_workers=max_workers)
+    _cnn_distribute_images(dftr, dfte, src_train=src_train, src_test=src_test, dst_root=dst_root, max_workers=max_workers)
     end_time = time.time()
     cnnlogger.info(f"Dataset created in {format_duration(end_time - start_time)}")
     return None
 
 
-def cnn_copy_file(src_file: str, dst_root: str, split: str, label: str, progress: Progress, task_id: Any) -> None:
+def _cnn_copy_file(src_file: str, dst_root: str, split: str, label: str, progress: Progress, task_id: Any) -> None:
     dst_folder = os.path.join(dst_root, split, label)
     os.makedirs(dst_folder, exist_ok=True)
     dst_file = os.path.join(dst_folder, os.path.basename(src_file))
@@ -54,18 +57,18 @@ def cnn_copy_file(src_file: str, dst_root: str, split: str, label: str, progress
     return None
 
 
-def cnn_prepare_tasks(df: pd.DataFrame, src_folder: str, split: str) -> list[tuple[str, str, Any]]:
+def _cnn_prepare_tasks(df: pd.DataFrame, src_folder: str, split: str) -> list[tuple[str, str, Any]]:
     global cnnlogger
     cnnlogger.info("Mapping images with labels")
-    mapping = {(str(row.productid), str(row.imageid)): row.prdtypecode for row in df.itertuples()}
-    pattern = re.compile(r"product_(\d+)_image_(\d+)\.jpg", re.IGNORECASE)
+    mapping = {(str(row.productid), str(row.imageid)): str(row.prdtypecode) for row in df.itertuples()}
+    pattern = re.compile(r"image_(\d+)_product_(\d+)\.jpg", re.IGNORECASE)
 
     cnnlogger.info("Building tasks")
     tasks = []
     for filename in os.listdir(src_folder):
         match = pattern.match(filename)
         if match:
-            idproduct, idimg = match.groups()
+            idimg, idproduct = match.groups()
             label = mapping.get((idproduct, idimg))
             if label:
                 src_file = os.path.join(src_folder, filename)
@@ -74,24 +77,47 @@ def cnn_prepare_tasks(df: pd.DataFrame, src_folder: str, split: str) -> list[tup
     return tasks
 
 
-def cnn_distribute_images(df: pd.DataFrame, src_train, src_test, dst_root, max_workers: int) -> None:
+def _cnn_run_split(split, tasks, dst_root, progress, task_id, max_workers):
+    """Exécute un split (train ou test) dans son propre pool de threads."""
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _cnn_copy_file, src_file, dst_root, split, label, progress, task_id
+            )
+            for src_file, _, label in tasks
+        ]
+        for f in as_completed(futures):
+            f.result()
+
+
+def _cnn_distribute_images(df_train: pd.DataFrame, df_test: pd.DataFrame, src_train, src_test, dst_root, max_workers: int) -> None:
     all_tasks = {}
-    all_tasks["train"] = cnn_prepare_tasks(df, src_train, "train")
-    all_tasks["test"] = cnn_prepare_tasks(df, src_test, "test")
+    all_tasks["train"] = _cnn_prepare_tasks(df_train, src_train, "train")
+    all_tasks["test"] = _cnn_prepare_tasks(df_test, src_test, "test")
+
     cnnlogger.info("Starting distribution of images")
-    with Progress() as progress:
-        task_ids = {
-            split: progress.add_task(f"[cyan]Création du dataset {split} (CNN)", total=len(tasks))
-            for split, tasks in all_tasks.items()
-        }
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
-            for split, tasks in all_tasks.items():
-                for src_file, split, label in tasks:
-                    futures.append(
-                        executor.submit(cnn_copy_file, src_file, dst_root, split, label, progress, task_ids[split])
-                    )
-            for f in as_completed(futures):
-                f.result()
+
+    progress = Progress()
+    task_ids = {
+        split: progress.add_task(
+            f"[white]Creation du dataset {split} (CNN)", total=len(tasks)
+        )
+        for split, tasks in all_tasks.items()
+    }
+    with Live(progress):
+        # 👉 On lance train et test dans deux threads indépendants
+        threads = []
+        for split, tasks in all_tasks.items():
+            t = threading.Thread(
+                target=_cnn_run_split,
+                args=(split, tasks, dst_root, progress, task_ids[split], max_workers),
+            )
+            threads.append(t)
+            t.start()
+
+        # Attente des 2 splits en parallèle
+        for t in threads:
+            t.join()
+
     cnnlogger.info("Distribution finished")
     return None

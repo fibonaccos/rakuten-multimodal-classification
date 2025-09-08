@@ -1,9 +1,14 @@
 {
+    "LOGS": {
+        "filePath": ".logs/{DATE}_",
+        "baseFormat": "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
+        "dateFormat": "%Y-%m-%d %H:%M:%S"
+    },
     "PREPROCESSING": {
         "PATHS": {
-            "rawTextData": ".data/raw/X_train.csv",
+            "rawTextData": ".data/raw/X_raw.csv",
             "rawImageFolder": ".data/raw/images/",
-            "rawLabels": ".data/raw/Y_train.csv",
+            "rawLabels": ".data/raw/Y_raw.csv",
             "cleanTextTrainData": ".data/clean/text_train.csv",
             "cleanTextTestData": ".data/clean/text_test.csv",
             "cleanImageTrainFolder": ".data/clean/image_train/",
@@ -13,7 +18,7 @@
         },
         "PIPELINE": {
             "toPipe": "image",
-            "sampleSize": 0,
+            "sampleSize": 10000,
             "trainSize": 0.8,
             "randomState": 42,
             "TEXTPIPELINE": {
@@ -45,21 +50,13 @@
                             "n_neighbors": 5,
                             "excluded_cols": ["productid", "imageid", "description", "designation"]}
                     }
-                ],
-                "RESAMPLING": {
-                    "active": false,
-                    "params": {
-                        "strategy": "equal",
-                        "kNeighbors": 5,
-                        "randomState": 5
-                    }
-                }
+                ]
             },
             "IMAGEPIPELINE": {
                 "CONSTANTS" : {
                     "imageShape": [500, 500, 3],
                     "enableCuda": true,
-                    "numThreads": 8
+                    "numThreads": 12
                 },
                 "STEPS": [
                     {
@@ -67,21 +64,21 @@
                         "transformer": "RandomImageRotation",
                         "params": {
                             "degree": 180,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
                         "stepName": "hflip",
                         "transformer": "RandomImageHFlip",
                         "params": {
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
                         "stepName": "vflip",
                         "transformer": "RandomImageVFlip",
                         "params": {
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -89,7 +86,7 @@
                         "transformer": "RandomImageCrop",
                         "params": {
                             "min_scale": 0.6,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -98,7 +95,7 @@
                         "params": {
                             "min_scale": 0.8,
                             "max_scale": 1.2,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -106,7 +103,7 @@
                         "transformer": "RandomImageBlur",
                         "params": {
                             "max_kernel": 7,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -114,7 +111,7 @@
                         "transformer": "RandomImageNoise",
                         "params": {
                             "max_std": 0.1,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -123,14 +120,14 @@
                         "params": {
                             "min_factor": 0.6,
                             "max_factor": 1.4,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
                         "stepName": "coloration",
                         "transformer": "RandomImageColoration",
                         "params": {
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -139,7 +136,7 @@
                         "params": {
                             "min_area": 0.02,
                             "max_area": 0.15,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     },
                     {
@@ -147,17 +144,12 @@
                         "transformer": "RandomImagePixelDropout",
                         "params": {
                             "max_rate": 0.3,
-                            "p": 0.5
+                            "p": 0.65
                         }
                     }
                 ]
             }
         }
-    },
-    "LOGS": {
-        "filePath": ".logs/{DATE}_",
-        "baseFormat": "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
-        "dateFormat": "%Y-%m-%d %H:%M:%S"
     },
     "MODELS": {
         "PATHS": {
@@ -170,7 +162,7 @@
         },
         "CNN": {
             "randomState": 42,
-            "numThreads": 16,
+            "numThreads": 8,
             "DATASET": {
                 "folderPath": ".data/models/cnn/",
                 "train": ".data/models/cnn/train/",

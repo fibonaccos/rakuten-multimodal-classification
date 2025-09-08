@@ -24,6 +24,7 @@ IPIPELOGGER.info("Importing built-ins, PIL, rich")
 
 import os
 import hashlib
+import shutil
 from typing import List
 from PIL import Image
 from rich.console import Console
@@ -39,7 +40,6 @@ import kornia.filters as Kfilters
 
 
 __all__ = ["IPIPELOGGER",
-           "TRANSFORM_REGISTRY",
            "RandomImageRotation",
            "RandomImageHFlip",
            "RandomImageVFlip",
@@ -54,13 +54,10 @@ __all__ = ["IPIPELOGGER",
            "stable_seed_from",
            "load_image_to_tensor",
            "save_tensor_to_image",
-           "AugmentationPipeline"]
+           "AugmentationPipeline",
+           "move_images"]
 
 
-TRANSFORM_REGISTRY = {}
-
-
-# utilitaires
 def stable_seed_from(global_seed: int, filename: str) -> int:
     h = hashlib.sha256(filename.encode("utf-8")).digest()
     name_int = int.from_bytes(h[:8], "big", signed=False)
@@ -84,11 +81,6 @@ def save_tensor_to_image(tensor: torch.Tensor, out_path: str):
     Image.fromarray(nd).save(out_path)
 
 
-def register_transform(cls):
-    TRANSFORM_REGISTRY[cls.__name__] = cls
-    return cls
-
-
 class BaseImageTransform:
     def __init__(self, p: float = 1.0) -> None:
         self.p = float(p)
@@ -98,7 +90,6 @@ class BaseImageTransform:
         raise NotImplementedError
 
 
-@register_transform
 class RandomImageRotation(BaseImageTransform):
     def __init__(self, p: float = 0.5, degree: float = 180.0) -> None:
         super().__init__(p=p)
@@ -113,7 +104,6 @@ class RandomImageRotation(BaseImageTransform):
         return out.squeeze(0)
 
 
-@register_transform
 class RandomImageHFlip(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
@@ -124,7 +114,6 @@ class RandomImageHFlip(BaseImageTransform):
         return torch.flip(img, dims=[2])
 
 
-@register_transform
 class RandomImageVFlip(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
@@ -135,7 +124,6 @@ class RandomImageVFlip(BaseImageTransform):
         return torch.flip(img, dims=[1])
 
 
-@register_transform
 class RandomImageCrop(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_scale: float = 0.6) -> None:
         super().__init__(p=p)
@@ -155,7 +143,6 @@ class RandomImageCrop(BaseImageTransform):
         return resized
 
 
-@register_transform
 class RandomImageZoom(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_scale: float = 0.8, max_scale: float = 1.2) -> None:
         super().__init__(p=p)
@@ -180,7 +167,6 @@ class RandomImageZoom(BaseImageTransform):
         return out
 
 
-@register_transform
 class RandomImageBlur(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_kernel: int = 7) -> None:
         super().__init__(p=p)
@@ -199,7 +185,6 @@ class RandomImageBlur(BaseImageTransform):
         return out.squeeze(0)
 
 
-@register_transform
 class RandomImageNoise(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_std: float = 0.1) -> None:
         super().__init__(p=p)
@@ -213,7 +198,6 @@ class RandomImageNoise(BaseImageTransform):
         return img + noise
 
 
-@register_transform
 class RandomImageContrast(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_factor: float = 0.6, max_factor: float = 1.4) -> None:
         super().__init__(p=p)
@@ -228,7 +212,6 @@ class RandomImageContrast(BaseImageTransform):
         return (img - mean) * factor + mean
 
 
-@register_transform
 class RandomImageColoration(BaseImageTransform):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__(p=p)
@@ -255,7 +238,6 @@ class RandomImageColoration(BaseImageTransform):
             return mixed
 
 
-@register_transform
 class RandomImageDropout(BaseImageTransform):
     def __init__(self, p: float = 0.5, min_area: float = 0.02, max_area: float = 0.2) -> None:
         super().__init__(p=p)
@@ -279,7 +261,6 @@ class RandomImageDropout(BaseImageTransform):
         return out
 
 
-@register_transform
 class RandomImagePixelDropout(BaseImageTransform):
     def __init__(self, p: float = 0.5, max_rate: float = 0.1) -> None:
         super().__init__(p=p)
@@ -329,7 +310,7 @@ class AugmentationPipeline:
     def run(self, image_list: List[str], out_dir: str, global_seed: int, max_workers: int) -> None:
         console = Console()
         with Progress(console=console) as progress:
-            task = progress.add_task("[white]Image augmentation ", total=len(image_list))
+            task = progress.add_task("[white]Augmentation des images :", total=len(image_list))
             futures = []
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 for path in image_list:
@@ -339,3 +320,17 @@ class AugmentationPipeline:
                     f.result()
                     progress.update(task, advance=1)
         return None
+
+
+def move_images(image_list: list[str], dst_folder: str, max_workers: int) -> None:
+    console = Console()
+    with Progress(console=console) as progress:
+        task = progress.add_task("[white]Copie des images test :", total=len(image_list))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for fichier in image_list:
+                dst = os.path.join(dst_folder, os.path.basename(fichier))
+                futures.append(executor.submit(shutil.copy2, fichier, dst))
+            for _ in as_completed(futures):
+                progress.update(task, advance=1)
+    return None

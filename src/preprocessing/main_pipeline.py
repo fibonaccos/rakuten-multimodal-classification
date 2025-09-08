@@ -186,6 +186,14 @@ def image_pipe(train: list[str], test: list[str]) -> None:
                           global_seed=PREPROCESSING_CONFIG["PIPELINE"]["randomState"],
                           max_workers=PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["numThreads"])
 
+    IPIPELOGGER.info("Augmentations finished")
+    IPIPELOGGER.info("Copying test images to clean/image_test/")
+    ipipe.move_images(image_list=test,
+                      dst_folder=PREPROCESSING_CONFIG["PATHS"]["cleanImageTestFolder"],
+                      max_workers=PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["numThreads"])
+
+    IPIPELOGGER.info("Test images copied to clean/image_test/")
+
     real_end_image = time.time()
     IPIPELOGGER.info(f"Image pipeline finished in {format_duration(real_end_image - real_start_image)}")
     return None
@@ -219,13 +227,13 @@ def pipe(to_pipe: Literal["text", "image", "all"]) -> None:
 
     if to_pipe == "text":
         PIPELOGGER.info("Selected pipeline(s) : 'text'")
-        PIPELOGGER.warning("Images dataset will not be processed with the chosen configuration. Change paramater to " \
+        PIPELOGGER.warning("Images dataset will not be processed with the chosen configuration. Change parameter to " \
                            "'image' or 'all' to enable image processing.")
         PIPELOGGER.info("Launching textual pipeline")
         text_pipe(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
     elif to_pipe == "image":
         PIPELOGGER.info("Selected pipeline(s) : 'image'")
-        PIPELOGGER.warning("Textual dataset will not be processed with the chosen configuration. Change paramater to " \
+        PIPELOGGER.warning("Textual dataset will not be processed with the chosen configuration. Change parameter to " \
                            "'text' or 'all' to enable text processing.")
         PIPELOGGER.info("Launching image pipeline")
         image_pipe(image_train, image_test)
