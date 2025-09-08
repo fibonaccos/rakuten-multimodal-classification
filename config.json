@@ -158,5 +158,25 @@
         "filePath": ".logs/{DATE}_",
         "baseFormat": "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s",
         "dateFormat": "%Y-%m-%d %H:%M:%S"
+    },
+    "MODELS": {
+        "PATHS": {
+            "cleanTextTrainData": ".data/clean/text_train.csv",
+            "cleanTextTestData": ".data/clean/text_test.csv",
+            "cleanImageTrainFolder": ".data/clean/image_train/",
+            "cleanImageTestFolder": ".data/clean/image_test/",
+            "cleanTrainLabels": ".data/clean/labels_train.csv",
+            "cleanTestLabels": ".data/clean/labels_test.csv"
+        },
+        "CNN": {
+            "randomState": 42,
+            "numThreads": 16,
+            "DATASET": {
+                "folderPath": ".data/models/cnn/",
+                "train": ".data/models/cnn/train/",
+                "validation": ".data/models/cnn/validation/",
+                "test": ".data/models/cnn/test/"
+            }
+        }
     }
 }
