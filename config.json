@@ -18,7 +18,7 @@
         },
         "PIPELINE": {
             "toPipe": "image",
-            "sampleSize": 10000,
+            "sampleSize": -1,
             "trainSize": 0.8,
             "randomState": 42,
             "TEXTPIPELINE": {
@@ -56,7 +56,7 @@
                 "CONSTANTS" : {
                     "imageShape": [500, 500, 3],
                     "enableCuda": true,
-                    "numThreads": 12
+                    "numThreads": 16
                 },
                 "STEPS": [
                     {
@@ -161,13 +161,22 @@
             "cleanTestLabels": ".data/clean/labels_test.csv"
         },
         "CNN": {
-            "randomState": 42,
-            "numThreads": 8,
             "DATASET": {
                 "folderPath": ".data/models/cnn/",
                 "train": ".data/models/cnn/train/",
-                "validation": ".data/models/cnn/validation/",
                 "test": ".data/models/cnn/test/"
+            },
+            "randomState": 42,
+            "numThreads": 16,
+            "enableCuda": true,
+            "imageShape": [500, 500, 3],
+            "TRAINING": {
+                "batchSize": 64,
+                "epochs": 10,
+                "optimizer": "adam",
+                "loss": "categorical_crossentropy",
+                "metrics": ["accuracy"],
+                "validationSplit": 0.2
             }
         }
     }
