@@ -1,4 +1,4 @@
-# Configuration du preprocessing avec config.json
+# Configuration du preprocessing avec `config.json`
 
 ## Introduction
 

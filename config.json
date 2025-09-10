@@ -64,7 +64,7 @@
                         "transformer": "RandomImageRotation",
                         "params": {
                             "degree": 180,
-                            "p": 0.65
+                            "p": 0.8
                         }
                     },
                     {
@@ -86,7 +86,7 @@
                         "transformer": "RandomImageCrop",
                         "params": {
                             "min_scale": 0.6,
-                            "p": 0.65
+                            "p": 0.35
                         }
                     },
                     {
@@ -95,7 +95,7 @@
                         "params": {
                             "min_scale": 0.8,
                             "max_scale": 1.2,
-                            "p": 0.65
+                            "p": 0.35
                         }
                     },
                     {
@@ -103,7 +103,7 @@
                         "transformer": "RandomImageBlur",
                         "params": {
                             "max_kernel": 7,
-                            "p": 0.65
+                            "p": 0.35
                         }
                     },
                     {
@@ -111,7 +111,7 @@
                         "transformer": "RandomImageNoise",
                         "params": {
                             "max_std": 0.1,
-                            "p": 0.65
+                            "p": 0.35
                         }
                     },
                     {
@@ -120,14 +120,14 @@
                         "params": {
                             "min_factor": 0.6,
                             "max_factor": 1.4,
-                            "p": 0.65
+                            "p": 0.5
                         }
                     },
                     {
                         "stepName": "coloration",
                         "transformer": "RandomImageColoration",
                         "params": {
-                            "p": 0.65
+                            "p": 0.7
                         }
                     },
                     {
@@ -135,16 +135,16 @@
                         "transformer": "RandomImageDropout",
                         "params": {
                             "min_area": 0.02,
-                            "max_area": 0.15,
-                            "p": 0.65
+                            "max_area": 0.05,
+                            "p": 0.35
                         }
                     },
                     {
                         "stepName": "pixel_dropout",
                         "transformer": "RandomImagePixelDropout",
                         "params": {
-                            "max_rate": 0.3,
-                            "p": 0.65
+                            "max_rate": 0.1,
+                            "p": 0.35
                         }
                     }
                 ]
@@ -161,22 +161,26 @@
             "cleanTestLabels": ".data/clean/labels_test.csv"
         },
         "CNN": {
-            "DATASET": {
-                "folderPath": ".data/models/cnn/",
-                "train": ".data/models/cnn/train/",
-                "test": ".data/models/cnn/test/"
-            },
             "randomState": 42,
             "numThreads": 16,
             "enableCuda": true,
             "imageShape": [500, 500, 3],
+            "DATASET": {
+                "folderPath": ".data/models/cnn/",
+                "train": ".data/models/cnn/train/",
+                "test": ".data/models/cnn/test/",
+                "numImages": -1,
+                "trainSize": 0.8
+            },
             "TRAINING": {
+                "imageShape": [128, 128, 3],
                 "batchSize": 64,
-                "epochs": 10,
+                "epochs": 30,
                 "optimizer": "adam",
                 "loss": "categorical_crossentropy",
-                "metrics": ["accuracy"],
-                "validationSplit": 0.2
+                "metrics": ["categorical_accuracy"],
+                "validationSplit": 0.2,
+                "bestModelPath": "models/cnn/best_model.h5"
             }
         }
     }

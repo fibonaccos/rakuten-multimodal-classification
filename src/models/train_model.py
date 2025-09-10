@@ -6,7 +6,7 @@ cnn = CNNModel(42)
 cnn.load_datasets()
 cnn.build()
 
-cnn.model_.summary()
+cnn.summary()
 
 
 history = cnn.train()
