@@ -1,246 +1,376 @@
 import sys
 import os
-import logging
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))  # pour trouver le module src/
-
-from src.config_loader import get_config  # fonction pour récupérer les infos de config.json
-from src.logger import build_logger  # fonction pour construire un logger, utilise le fichier config.json
-from src.utils import timer, format_duration  # décorateur pour timer l'exécution d'une fonction
-
-
-PREPROCESSING_CONFIG = get_config("PREPROCESSING")  # charge le contenu de la config "PREPROCESSING"
-LOG_CONFIG = get_config("LOGS")  # charge le contenu de la config "LOGS"
-
-# création d'un logger pour le pipeline générale : écrit dans le fichier 'filepath' avec les formatages 'baseformat' et 'dateformat'
-PIPELOGGER = build_logger(name="pipeline",
-                          filepath=LOG_CONFIG["filePath"],
-                          baseformat=LOG_CONFIG["baseFormat"],
-                          dateformat=LOG_CONFIG["dateFormat"],
-                          level=logging.INFO)
-
-PIPELOGGER.info("Running main_pipeline.py")
-PIPELOGGER.info("Resolving imports on main_pipeline.py")
-
-
-from sklearn.model_selection import train_test_split
-from typing import Any, Literal
 import pandas as pd
-import time
+import numpy as np
+import logging
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from pathlib import Path
+import pickle
 
+# Import optionnel de cv2
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    print("Attention: opencv-python (cv2) n'est pas installé. Les features d'images seront désactivées.")
 
-def split_data() -> tuple:
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from src.config_loader import get_config, ensure_output_dirs
+from src.logger import build_logger
+
+class DecisionTreePreprocessor:
     """
-    Split the datasets by returning a tuple containing the results of the `sklearn` method `train_test_split` with
-    lists containing the corresponding image names.
-
-    Returns:
-        tuple: A tuple given by `(X_train, X_test, y_train, y_test, image_train, image_test)` where `image_train`
-            and `image_test` are lists of image names.
-    """
-
-    sample_size: int = PREPROCESSING_CONFIG["PIPELINE"]["sampleSize"]
-    if sample_size <= 0:
-        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0)
-        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0)
-    else:
-        X = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawTextData"], index_col=0, nrows=sample_size)
-        y = pd.read_csv(PREPROCESSING_CONFIG["PATHS"]["rawLabels"], index_col=0, nrows=sample_size)
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y,
-                                                        stratify=y,
-                                                        train_size=PREPROCESSING_CONFIG["PIPELINE"]["trainSize"],
-                                                        random_state=PREPROCESSING_CONFIG["PIPELINE"]["randomState"])
-
-    image_train: list[str] = [PREPROCESSING_CONFIG["PATHS"]["rawImageFolder"] + "image_" + str(image_id) + "_product_" + str(product_id) + ".jpg"
-                              for image_id, product_id in zip(X_train["imageid"].values, X_train["productid"].values)]
-
-    image_test: list[str] = [PREPROCESSING_CONFIG["PATHS"]["rawImageFolder"] + "image_" + str(image_id) + "_product_" + str(product_id) + ".jpg"
-                              for image_id, product_id in zip(X_test["imageid"].values, X_test["productid"].values)]
-
-    y_train_image = pd.concat([X_train[["productid"]], X_train[["imageid"]], y_train], axis=1)
-    y_test_image = pd.concat([X_test[["productid"]], X_test[["imageid"]], y_test], axis=1)
-
-    y_train_image.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTrainLabels"], index=False, header=True)
-    y_test_image.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTestLabels"], index=False, header=True)
-
-    return X_train, X_test, y_train, y_test, image_train, image_test
-
-
-@timer
-def text_pipe(X_train: pd.DataFrame, X_test: pd.DataFrame, y_train: pd.DataFrame, y_test: pd.DataFrame) -> None:
-    """
-    Execute the text preprocessing pipeline using metadata from `config.json` file.
-
-    Args:
-        X_train (pd.DataFrame): The training textual dataset.
-        X_test (pd.DataFrame): The testing textual dataset.
-        y_train (pd.DataFrame): The training labels.
-        y_test (pd.DataFrame): The testing labels.
-
-    Returns:
-        None:
+    Pipeline de preprocessing spécialement adapté pour les arbres de décision.
+    Extrait des features numériques simples à partir des données textuelles et d'images.
     """
 
-    PIPELOGGER.info("Importing textual_pipeline_components.py")
-    import textual_pipeline_components as tpipe
+    def __init__(self):
+        self.config = get_config()
+        self.preprocessing_config = self.config["PREPROCESSING"]
+        self.dt_config = self.config["DECISION_TREE"]
+        self.log_config = self.config["LOGS"]
 
-    PIPELOGGER.info("Importing sklearn components")
-    from sklearn.pipeline import Pipeline
+        # Initialiser le logger
+        self.logger = build_logger(
+            name="dt_preprocessing",
+            filepath=self.log_config["filePath"],
+            baseformat=self.log_config["baseFormat"],
+            dateformat=self.log_config["dateFormat"],
+            level=logging.INFO
+        )
 
-    PIPELOGGER.info("Modules imported, launching text_pipe")
+        # Initialiser les transformateurs
+        self.tfidf_vectorizer = None
+        self.label_encoder = LabelEncoder()
+        self.scaler = StandardScaler()
 
+    def load_data(self):
+        """Charge les données brutes"""
+        self.logger.info("Chargement des données...")
 
-    TPIPELOGGER = tpipe.TPIPELOGGER
+        # Charger les données textuelles
+        text_path = self.preprocessing_config["paths"]["rawTextData"]
+        self.X_text = pd.read_csv(text_path)
+        self.logger.info(f"Données textuelles chargées: {self.X_text.shape}")
 
-    real_start_text = time.time()
+        # Charger les labels
+        labels_path = self.preprocessing_config["paths"]["rawLabels"]
+        self.y = pd.read_csv(labels_path)
+        self.logger.info(f"Labels chargés: {self.y.shape}")
 
-    TPIPELOGGER.info("Running textual pipeline")
+        # Chemin des images
+        self.images_path = Path(self.preprocessing_config["paths"]["rawImageFolder"])
 
-    pipeline_steps: list[tuple[str, Any]] = [(step["stepName"], getattr(tpipe, step["transformer"])(**step["params"]))
-                                             for step in PREPROCESSING_CONFIG["PIPELINE"]["TEXTPIPELINE"]["STEPS"]]
+    def extract_text_features(self):
+        """Extrait des features numériques à partir des données textuelles"""
+        self.logger.info("Extraction des features textuelles...")
 
-    pipe = Pipeline(steps=[(step[0], step[1]) for step in pipeline_steps])
+        text_features = []
 
-    TPIPELOGGER.info("Processing textual train data")
-    clean_X_train = pipe.fit_transform(X_train, y_train)
+        # Combiner les colonnes textuelles si elles existent
+        text_columns = self.preprocessing_config["pipeline"]["textpipeline"]["constants"]["textualColumns"]
 
-    TPIPELOGGER.info("Processing textual test data")
-    clean_X_test = pipe.transform(X_test)
+        # Vérifier quelles colonnes existent réellement
+        available_columns = [col for col in text_columns if col in self.X_text.columns]
 
-    clean_train = pd.DataFrame(clean_X_train)
-    clean_test = pd.DataFrame(clean_X_test)
+        if available_columns:
+            # Combiner les textes
+            combined_text = self.X_text[available_columns].fillna('').agg(' '.join, axis=1)
 
-    TPIPELOGGER.info("Saving textual train data")
-    clean_train.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTrainData"], index=False, header=True)
+            # Features TF-IDF si activé
+            if self.dt_config["feature_engineering"]["text_features"]["use_tfidf"]:
+                max_features = self.dt_config["feature_engineering"]["text_features"]["max_features"]
+                ngram_range = tuple(self.dt_config["feature_engineering"]["text_features"]["ngram_range"])
 
-    TPIPELOGGER.info("Saving textual test data")
-    clean_test.to_csv(PREPROCESSING_CONFIG["PATHS"]["cleanTextTestData"], index=False, header=True)
+                self.tfidf_vectorizer = TfidfVectorizer(
+                    max_features=max_features,
+                    ngram_range=ngram_range,
+                    stop_words='english'
+                )
 
-    real_end_text = time.time()
+                tfidf_features = self.tfidf_vectorizer.fit_transform(combined_text).toarray()
+                text_features.append(tfidf_features)
+                self.logger.info(f"Features TF-IDF extraites: {tfidf_features.shape}")
 
-    TPIPELOGGER.info(f"Textual pipeline finished in {format_duration(real_end_text - real_start_text)}")
-    return None
+            # Features statistiques basiques sur le texte
+            text_stats = pd.DataFrame({
+                'text_length': combined_text.str.len(),
+                'word_count': combined_text.str.split().str.len(),
+                'char_count_no_spaces': combined_text.str.replace(' ', '').str.len(),
+                'punctuation_count': combined_text.str.count(r'[^\w\s]'),
+                'uppercase_count': combined_text.str.count(r'[A-Z]'),
+                'digit_count': combined_text.str.count(r'\d')
+            }).fillna(0)
 
+            text_features.append(text_stats.values)
+            self.logger.info(f"Features statistiques textuelles extraites: {text_stats.shape}")
 
-@timer
-def image_pipe(train: list[str], test: list[str]) -> None:
-    """
-    Execute the image preprocessing pipeline using metadata from `config.json` file. If
-    *numThreads* > 1, then CPU multithreading will be enabled with the chosen number of
-    threads.
+        # Autres colonnes numériques si elles existent
+        numeric_columns = self.X_text.select_dtypes(include=[np.number]).columns
+        if len(numeric_columns) > 0:
+            numeric_features = self.X_text[numeric_columns].fillna(0).values
+            text_features.append(numeric_features)
+            self.logger.info(f"Features numériques extraites: {numeric_features.shape}")
 
-    Args:
-        train (list[str]): The training image names.
-        test (list[str]): The testing image names.
-
-    Returns:
-        None:
-    """
-
-    PIPELOGGER.info("Importing image_pipeline_components.py")
-    import images_pipeline_components as ipipe
-
-    PIPELOGGER.info("Importing torch")
-    import torch
-
-    PIPELOGGER.info("Modules imported, launching image_pipe")
-
-
-    IPIPELOGGER = ipipe.IPIPELOGGER
-
-    real_start_image = time.time()
-
-    IPIPELOGGER.info("Starting image pipeline")
-
-    os.makedirs(PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"], exist_ok=True)
-    os.makedirs(PREPROCESSING_CONFIG["PATHS"]["cleanImageTestFolder"], exist_ok=True)
-
-    device = ""
-    if PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["enableCuda"]:
-        if torch.cuda.is_available():
-            device = "cuda"
+        # Combiner toutes les features textuelles
+        if text_features:
+            self.text_features_array = np.hstack(text_features)
         else:
-            IPIPELOGGER.warning("You enabled GPU usage but it is not available for torch, thus " \
-                                "image augmentations will run on CPU, which may highly increase "
-                                "execution time.")
-            device = "cpu"
-    else:
-        IPIPELOGGER.warning("GPU usage is disabled, thus image augmentations will run on CPU, " \
-                            "which may highly increase execution time. Consider enabling the GPU " \
-                            "usage if compatible.")
-        device = "cpu"
+            self.text_features_array = np.array([]).reshape(len(self.X_text), 0)
 
-    transformations = [getattr(ipipe, step["transformer"])(**step["params"])
-                       for step in PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]]
+        self.logger.info(f"Features textuelles finales: {self.text_features_array.shape}")
 
-    IPIPELOGGER.info("Building augmentations")
-    augmentation_pipe = ipipe.AugmentationPipeline(transforms=transformations, device=device)
+    def extract_image_features(self):
+        """Extrait des features numériques simples à partir des images"""
+        self.logger.info("Extraction des features d'images...")
 
-    for step in PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["STEPS"]:
-        IPIPELOGGER.info(f"Augmentation available : {step["transformer"]}")
+        if not CV2_AVAILABLE:
+            self.logger.warning("cv2 non disponible - création de features d'images par défaut")
+            # Créer des features par défaut (zéros)
+            feature_size = self._get_image_feature_size()
+            self.image_features_array = np.zeros((len(self.X_text), feature_size))
+            return
 
-    IPIPELOGGER.info("Running augmentations on images")
-    augmentation_pipe.run(image_list=train,
-                          out_dir=PREPROCESSING_CONFIG["PATHS"]["cleanImageTrainFolder"],
-                          global_seed=PREPROCESSING_CONFIG["PIPELINE"]["randomState"],
-                          max_workers=PREPROCESSING_CONFIG["PIPELINE"]["IMAGEPIPELINE"]["CONSTANTS"]["numThreads"])
+        image_features = []
+        image_ids = []
 
-    real_end_image = time.time()
-    IPIPELOGGER.info(f"Image pipeline finished in {format_duration(real_end_image - real_start_image)}")
-    return None
+        # Obtenir les IDs d'images (supposant une colonne 'imageid' dans les données textuelles)
+        if 'imageid' in self.X_text.columns:
+            image_ids = self.X_text['imageid'].values
+        else:
+            # Essayer de déduire l'ID à partir du nom de fichier d'image
+            self.logger.warning("Colonne 'imageid' non trouvée, extraction des IDs depuis les noms de fichiers")
+            image_files = list(self.images_path.glob("*.jpg"))
+            image_ids = [f.stem for f in image_files[:len(self.X_text)]]
 
+        for img_id in image_ids:
+            try:
+                # Trouver l'image correspondante
+                img_files = list(self.images_path.glob(f"*{img_id}*"))
+                if not img_files:
+                    # Image par défaut (features nulles)
+                    features = np.zeros(self._get_image_feature_size())
+                else:
+                    img_path = img_files[0]
+                    features = self._extract_single_image_features(img_path)
 
-@timer
-def pipe(to_pipe: Literal["text", "image", "all"]) -> None:
-    """
-    The main preprocessing pipeline. It uses the metadata from the `config.json` file.
-    It is composed of two separated pipelines respectively processing textual and images
-    datasets. The image pipeline supports multithreading if enabled in the config file
-    (*numThreads* > 1), which is recommanded to improve execution time.
+                image_features.append(features)
 
-        .. performance_example::
-            - **numThreads** : 16
+            except Exception as e:
+                self.logger.warning(f"Erreur lors du traitement de l'image {img_id}: {e}")
+                # Features par défaut en cas d'erreur
+                image_features.append(np.zeros(self._get_image_feature_size()))
 
-            - **RAM** : 32Go
+        self.image_features_array = np.array(image_features)
+        self.logger.info(f"Features d'images extraites: {self.image_features_array.shape}")
 
-            - **CPU** : Intel i7 11700K
+    def _extract_single_image_features(self, img_path):
+        """Extrait des features d'une seule image"""
+        if not CV2_AVAILABLE:
+            return np.zeros(self._get_image_feature_size())
 
-            - **GPU** : Nvidia RTX 3080 10Go
-            **Total time** : - .
-    """
+        # Charger l'image
+        img = cv2.imread(str(img_path))
+        if img is None:
+            return np.zeros(self._get_image_feature_size())
 
-    real_start = time.time()
+        features = []
 
-    PIPELOGGER.info("Starting main pipeline")
-    PIPELOGGER.info("Splitting data")
+        # Features de base si activées
+        if self.dt_config["feature_engineering"]["image_features"]["use_basic_stats"]:
+            # Statistiques de base par canal
+            for channel in range(3):  # RGB
+                channel_data = img[:, :, channel]
+                features.extend([
+                    np.mean(channel_data),
+                    np.std(channel_data),
+                    np.min(channel_data),
+                    np.max(channel_data),
+                    np.median(channel_data)
+                ])
 
-    X_train, X_test, y_train, y_test, image_train, image_test = split_data()
+            # Statistiques globales
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            features.extend([
+                np.mean(gray),
+                np.std(gray),
+                img.shape[0],  # hauteur
+                img.shape[1],  # largeur
+                img.shape[0] * img.shape[1]  # surface
+            ])
 
-    if to_pipe == "text":
-        PIPELOGGER.info("Selected pipeline(s) : 'text'")
-        PIPELOGGER.warning("Images dataset will not be processed with the chosen configuration. Change paramater to " \
-                           "'image' or 'all' to enable image processing.")
-        PIPELOGGER.info("Launching textual pipeline")
-        text_pipe(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
-    elif to_pipe == "image":
-        PIPELOGGER.info("Selected pipeline(s) : 'image'")
-        PIPELOGGER.warning("Textual dataset will not be processed with the chosen configuration. Change paramater to " \
-                           "'text' or 'all' to enable text processing.")
-        PIPELOGGER.info("Launching image pipeline")
-        image_pipe(image_train, image_test)
-    else:
-        PIPELOGGER.info("Selected pipeline(s) : 'text', 'image'")
+        # Histogramme si activé
+        if self.dt_config["feature_engineering"]["image_features"]["use_histogram"]:
+            bins = self.dt_config["feature_engineering"]["image_features"]["histogram_bins"]
 
-        PIPELOGGER.info("Launching textual pipeline")
-        text_pipe(X_train=X_train, X_test=X_test, y_train=y_train, y_test=y_test)
+            # Histogramme par canal
+            for channel in range(3):
+                hist, _ = np.histogram(img[:, :, channel], bins=bins, range=(0, 256))
+                features.extend(hist)
 
-        PIPELOGGER.info("Launching image pipeline")
-        image_pipe(image_train, image_test)
+        return np.array(features)
 
-    real_end = time.time()
-    PIPELOGGER.info(f"Main pipeline finished in {format_duration(real_end - real_start)}")
-    return None
+    def _get_image_feature_size(self):
+        """Calcule la taille des features d'image"""
+        size = 0
 
+        if self.dt_config["feature_engineering"]["image_features"]["use_basic_stats"]:
+            size += 3 * 5 + 5  # 5 stats par canal RGB + 5 stats globales
 
-pipe(PREPROCESSING_CONFIG["PIPELINE"]["toPipe"])
+        if self.dt_config["feature_engineering"]["image_features"]["use_histogram"]:
+            bins = self.dt_config["feature_engineering"]["image_features"]["histogram_bins"]
+            size += 3 * bins  # histogramme par canal RGB
+
+        return size
+
+    def prepare_labels(self):
+        """Prépare les labels pour l'entraînement"""
+        self.logger.info("Préparation des labels...")
+
+        # Encoder les labels
+        label_column = 'prdtypecode' if 'prdtypecode' in self.y.columns else self.y.columns[0]
+        self.labels_encoded = self.label_encoder.fit_transform(self.y[label_column])
+
+        self.logger.info(f"Nombre de classes: {len(self.label_encoder.classes_)}")
+
+    def combine_features(self):
+        """Combine toutes les features en un seul dataset"""
+        self.logger.info("Combinaison des features...")
+
+        # Combiner les features textuelles et d'images
+        features_list = []
+
+        if self.text_features_array.shape[1] > 0:
+            features_list.append(self.text_features_array)
+
+        if self.image_features_array.shape[1] > 0:
+            features_list.append(self.image_features_array)
+
+        if features_list:
+            self.X_combined = np.hstack(features_list)
+        else:
+            raise ValueError("Aucune feature extraite !")
+
+        self.logger.info(f"Features combinées: {self.X_combined.shape}")
+
+    def split_and_scale_data(self):
+        """Divise les données en train/test et applique la normalisation"""
+        self.logger.info("Division et normalisation des données...")
+
+        train_size = self.preprocessing_config["pipeline"]["trainSize"]
+        random_state = self.preprocessing_config["pipeline"]["randomState"]
+
+        # Division train/test
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            self.X_combined,
+            self.labels_encoded,
+            train_size=train_size,
+            random_state=random_state,
+            stratify=self.labels_encoded
+        )
+
+        # Normalisation
+        self.X_train_scaled = self.scaler.fit_transform(self.X_train)
+        self.X_test_scaled = self.scaler.transform(self.X_test)
+
+        self.logger.info(f"Données d'entraînement: {self.X_train_scaled.shape}")
+        self.logger.info(f"Données de test: {self.X_test_scaled.shape}")
+
+    def save_preprocessed_data(self):
+        """Sauvegarde les données préprocessées"""
+        self.logger.info("Sauvegarde des données préprocessées...")
+
+        # Créer les répertoires de sortie
+        ensure_output_dirs(self.config)
+
+        # Sauvegarder les features
+        features_path = self.dt_config["output_paths"]["features_path"]
+
+        # Créer un DataFrame avec toutes les features
+        feature_names = []
+
+        # Noms des features TF-IDF
+        if self.tfidf_vectorizer is not None:
+            feature_names.extend([f'tfidf_{i}' for i in range(len(self.tfidf_vectorizer.get_feature_names_out()))])
+
+        # Noms des features statistiques textuelles
+        feature_names.extend(['text_length', 'word_count', 'char_count_no_spaces',
+                             'punctuation_count', 'uppercase_count', 'digit_count'])
+
+        # Noms des features d'images
+        if self.dt_config["feature_engineering"]["image_features"]["use_basic_stats"]:
+            for channel in ['R', 'G', 'B']:
+                feature_names.extend([f'{channel}_mean', f'{channel}_std', f'{channel}_min',
+                                    f'{channel}_max', f'{channel}_median'])
+            feature_names.extend(['gray_mean', 'gray_std', 'height', 'width', 'area'])
+
+        if self.dt_config["feature_engineering"]["image_features"]["use_histogram"]:
+            bins = self.dt_config["feature_engineering"]["image_features"]["histogram_bins"]
+            for channel in ['R', 'G', 'B']:
+                feature_names.extend([f'{channel}_hist_{i}' for i in range(bins)])
+
+        # Ajuster la longueur des noms de features
+        while len(feature_names) < self.X_combined.shape[1]:
+            feature_names.append(f'feature_{len(feature_names)}')
+
+        # Créer le DataFrame final
+        df_features = pd.DataFrame(self.X_combined, columns=feature_names[:self.X_combined.shape[1]])
+        df_features['label'] = self.labels_encoded
+
+        df_features.to_csv(features_path, index=False)
+        self.logger.info(f"Features sauvegardées dans: {features_path}")
+
+        # Sauvegarder les transformateurs
+        transformers = {
+            'tfidf_vectorizer': self.tfidf_vectorizer,
+            'label_encoder': self.label_encoder,
+            'scaler': self.scaler,
+            'feature_names': feature_names
+        }
+
+        transformers_path = features_path.replace('.csv', '_transformers.pkl')
+        with open(transformers_path, 'wb') as f:
+            pickle.dump(transformers, f)
+
+        self.logger.info(f"Transformateurs sauvegardés dans: {transformers_path}")
+
+    def run_preprocessing(self):
+        """Exécute le pipeline complet de preprocessing"""
+        self.logger.info("Démarrage du preprocessing pour arbres de décision...")
+
+        try:
+            self.load_data()
+            self.extract_text_features()
+            self.extract_image_features()
+            self.prepare_labels()
+            self.combine_features()
+            self.split_and_scale_data()
+            self.save_preprocessed_data()
+
+            self.logger.info("Preprocessing terminé avec succès !")
+
+            # Retourner les données préparées
+            return {
+                'X_train': self.X_train_scaled,
+                'X_test': self.X_test_scaled,
+                'y_train': self.y_train,
+                'y_test': self.y_test,
+                'feature_names': list(range(self.X_combined.shape[1])),
+                'label_encoder': self.label_encoder
+            }
+
+        except Exception as e:
+            self.logger.error(f"Erreur lors du preprocessing: {e}")
+            raise
+
+def main():
+    """Fonction principale pour lancer le preprocessing"""
+    preprocessor = DecisionTreePreprocessor()
+    return preprocessor.run_preprocessing()
+
+if __name__ == "__main__":
+    main()

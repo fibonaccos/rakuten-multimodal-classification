@@ -12,21 +12,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 
 from src.config_loader import get_config  # fonction pour récupérer les infos de config.json
 ```
+
 Le chemin `"../../"` peut être amené à changer selon la position du fichier python par rapport au fichier config.json. Dans l'exemple, on a :
 
 - src/
-    - preprocessing/
-        - main_pipeline.py
-    - config_loader.py
+  - preprocessing/
+    - main_pipeline.py
+  - config_loader.py
 - config.json
-
 
 On peut ensuite utiliser la configuration souhaitée (preprocessing, training, ...) :
 
 ```python
 PREPROCESSING_CONFIG = get_config("PREPROCESSING")  # récupère la configuration du preprocessing sous forme de dictionnaire
 ```
-
 
 ## Preprocessing
 
@@ -55,26 +54,26 @@ Contient les paramètres et méta-données nécessaires pour l'exécution des pi
 - **trainSize**, ***float*** : pourcentage de l'échantillon à utiliser comme jeu d'entraînement.
 - **randomState**, ***int*** : graine aléatoire générale pour la reproductibilité.
 - **textpipeline** : contient les paramètres du pipeline textuel. Les caractères indiqués dans les champs **Characters* ont vocation à être utilisés au sein d'un transformer de nettoyage de caractères.
-    - **constants** :
-        - **textualColumns**, ***list[str]*** : noms des colonnes du dataset sujet au traitement.
-        - **alphanumCharacters**, ***str*** : caractères alphanumériques conservés lors du nettoyage.
-        - **ponctuationCharacters**, ***str*** : ponctuation conservée lors du nettoyage.
-        - **accentCharacters**, ***str*** : accents conservés lors du nettoyage.
-        - **maxTokenVectorizer**, ***int*** : nombre maximum de tokens supportés par le modèle de vectorisation utilisé.
-        - **embeddingDimension**, ***int*** : dimension des vecteurs issues de la vectorisation.
-    - **steps** : étapes intégrées dans le pipeline textuel. L'ordre importe. Doit uniquement contenir des classes supportées par l'API scikit-learn : les classes doivent hériter de *BaseEstimator*, *TransformerMixin* et doivent implémenter les méthodes *fit* et *transform*. Chaque *step* contient :
-        - **stepName**, ***str*** : le nom de l'étape. N'a aucun effet sur le traitement.
-        - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
--  **imagepipeline** : contient les paramètres du pipeline d'images.
-    - **constants** :
-        - **imageShape**, ***list[int]*** : les dimensions des images, en convention *channel-last*.
-        - **enableCuda**, ***bool*** : permet d'utiliser le GPU pour exécuter les transformations d'images. Nécessite un GPU compatible.
-        - **numThreads**, ***bool*** : nombre de threads à allouer pour le traitement CPU en parallèle.
-    - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *BaseImageTransform* et doivent implémenter la méthode $\,$*\_\_call\_\_* qui prend en paramètre une image sous forme de *torch.Tensor* et 2 générateurs *torch.Generator* (nécessaire au support CPU et GPU). Chaque *step* contient :
-        - **stepName**, ***str*** : le nom de la transformation. Aucun effet sur le traitement.
-        - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
-        - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
+  - **constants** :
+    - **textualColumns**, ***list[str]*** : noms des colonnes du dataset sujet au traitement.
+    - **alphanumCharacters**, ***str*** : caractères alphanumériques conservés lors du nettoyage.
+    - **ponctuationCharacters**, ***str*** : ponctuation conservée lors du nettoyage.
+    - **accentCharacters**, ***str*** : accents conservés lors du nettoyage.
+    - **maxTokenVectorizer**, ***int*** : nombre maximum de tokens supportés par le modèle de vectorisation utilisé.
+    - **embeddingDimension**, ***int*** : dimension des vecteurs issues de la vectorisation.
+  - **steps** : étapes intégrées dans le pipeline textuel. L'ordre importe. Doit uniquement contenir des classes supportées par l'API scikit-learn : les classes doivent hériter de *BaseEstimator*, *TransformerMixin* et doivent implémenter les méthodes *fit* et *transform*. Chaque *step* contient :
+    - **stepName**, ***str*** : le nom de l'étape. N'a aucun effet sur le traitement.
+    - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
+    - **params**, ***dict[str, Any]*** : un dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
+- **imagepipeline** : contient les paramètres du pipeline d'images.
+  - **constants** :
+    - **imageShape**, ***list[int]*** : les dimensions des images, en convention *channel-last*.
+    - **enableCuda**, ***bool*** : permet d'utiliser le GPU pour exécuter les transformations d'images. Nécessite un GPU compatible.
+    - **numThreads**, ***bool*** : nombre de threads à allouer pour le traitement CPU en parallèle.
+  - **steps** : étapes intégrées dans le pipeline d'images. L'ordre importe. Doit uniquement contenir des classes héritées de *BaseImageTransform* et doivent implémenter la méthode $\,$*\_\_call\_\_* qui prend en paramètre une image sous forme de *torch.Tensor* et 2 générateurs *torch.Generator* (nécessaire au support CPU et GPU). Chaque *step* contient :
+    - **stepName**, ***str*** : le nom de la transformation. Aucun effet sur le traitement.
+    - **transformer**, ***classname*** : nom de la classe utilisée pour la transformation.
+    - **params**, ***dict[str, Any]*** : dictionnaire de paramètres pour instancier la classe utilisée. Sensible à la casse.
 
 ## Logs
 
