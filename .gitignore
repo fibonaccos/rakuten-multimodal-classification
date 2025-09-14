@@ -185,3 +185,5 @@ data/
 # Log files
 logs/
 *.log
+
+.idea
