@@ -162,8 +162,18 @@ cython_debug/
 # VSCode configuration files
 .vscode/
 
-# Data folder
+# Data folder - ignore datasets and processed files
+data/
 .data/
 
 # Logs
 .logs/
+logs/
+
+# Models - ignore trained models (too large for git)
+models/*.joblib
+models/*.h5
+
+# Reports with large files
+reports/figures/*.png
+reports/figures/*.jpg

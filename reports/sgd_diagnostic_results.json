@@ -1,0 +1,48 @@
+{
+  "data_shape": [
+    84916,
+    1126
+  ],
+  "num_classes": 27,
+  "class_distribution": {
+    "0": 3116,
+    "1": 2508,
+    "2": 1681,
+    "3": 832,
+    "4": 2671,
+    "5": 3953,
+    "6": 764,
+    "7": 4870,
+    "8": 2070,
+    "9": 5045,
+    "10": 807,
+    "11": 2491,
+    "12": 3241,
+    "13": 5073,
+    "14": 4303,
+    "15": 803,
+    "16": 4993,
+    "17": 824,
+    "18": 4760,
+    "19": 4774,
+    "20": 1421,
+    "21": 4989,
+    "22": 2589,
+    "23": 10209,
+    "24": 2496,
+    "25": 2761,
+    "26": 872
+  },
+  "imbalance_ratio": 13.362565445026178,
+  "missing_values": 0,
+  "constant_features": 3,
+  "data_normalized": false,
+  "recommendations": [
+    "Use class_weight=\"balanced\"",
+    "Apply StandardScaler",
+    "Remove constant features",
+    "Increase max_iter to 5000+",
+    "Use smaller learning rates",
+    "Try loss=\"log_loss\""
+  ]
+}
