@@ -5,19 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="56d837f7-b448-451c-86ad-4975a90e430c" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/SGD_IMPLEMENTATION_GUIDE.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/check_data.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/optimize_sgd.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/to_do.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/train_sgd.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/train_sgd_fixed.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/logger.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/predict_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/predict_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/train_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/train_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,25 +30,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.diagnose_sgd_issues.executor": "Run",
-    "Python.prepare_colab.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "sgdc__classifier",
-    "last_opened_file_path": "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/git/rakuten-multimodal-classification",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.diagnose_sgd_issues.executor&quot;: &quot;Run&quot;,
+    &quot;Python.prepare_colab.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;sgdc__classifier&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/git/rakuten-multimodal-classification&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten\git\rakuten-multimodal-classification" />
       <recent name="C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten\git\rakuten-multimodal-classification\data" />
     </key>
   </component>
@@ -100,7 +89,8 @@
       <workItem from="1757930267191" duration="400000" />
       <workItem from="1757934340897" duration="8929000" />
       <workItem from="1758106885429" duration="5711000" />
-      <workItem from="1758272195506" duration="5933000" />
+      <workItem from="1758272195506" duration="8361000" />
+      <workItem from="1758458768275" duration="33000" />
     </task>
     <servers />
   </component>
