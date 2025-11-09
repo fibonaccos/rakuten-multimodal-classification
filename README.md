@@ -42,4 +42,6 @@ Project Organization
 
 --------
 
+Ordre d'execution : nettoyage.ipynb -> shap_interpret.py -> train_svm.py
+
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
