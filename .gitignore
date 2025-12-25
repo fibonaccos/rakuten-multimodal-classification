@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+ s# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -82,6 +82,10 @@ target/
 profile_default/
 ipython_config.py
 
+# Données preprocessées (très volumineuses)
+data/processed/*.csv
+data/processed/*.pkl
+
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is
 #   intended to run in multiple environments; otherwise, check them in:
@@ -163,4 +167,21 @@ cython_debug/
 .vscode/
 
 # Data folder
+.data/
+
+# Logs
+.logs/
+
+# Data files - too large for Git
 data/
+*.jpg
+*.png
+*.jpeg
+*.tiff
+*.bmp
+
+# Log files
+logs/
+*.log
+
+.idea
