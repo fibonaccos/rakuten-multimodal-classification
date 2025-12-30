@@ -1,0 +1,60 @@
+metadata:
+  name: "decision_tree_config"
+  description: "Configuration for training and inference of DecisionTreeClassifier model."
+
+
+train:
+  config:
+    random_state: 42
+    threads: -1  # Use all available cores
+    criterion: "gini"  # or "entropy"
+    max_depth: null  # null for unlimited
+    min_samples_split: 2
+    min_samples_leaf: 1
+    max_features: null  # null for all features
+    max_leaf_nodes: null
+    ccp_alpha: 0.0  # Complexity parameter for pruning
+    logs:
+      file_path: ".logs/models/{DATE}_decision_tree_train_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  data_dir:
+    train_features: "data/clean/decision_tree_model/train_features.csv"
+    test_features: "data/clean/decision_tree_model/test_features.csv"
+    train_labels: "data/clean/decision_tree_model/train_labels.csv"
+    test_labels: "data/clean/decision_tree_model/test_labels.csv"
+    transformers: "data/clean/decision_tree_model/transformers.pkl"
+
+  artefacts:
+    base_dir: "models/DecisionTreeModel/artefacts/"
+    model_file: "models/DecisionTreeModel/artefacts/decision_tree_model.pkl"
+    label_encoder: "models/DecisionTreeModel/artefacts/label_encoder.pkl"
+    tree_structure: "models/DecisionTreeModel/artefacts/tree_structure.txt"
+
+  metrics:
+    base_dir: "models/DecisionTreeModel/metrics/"
+    confusion_matrix: "models/DecisionTreeModel/metrics/confusion_matrix.png"
+    classification_report: "models/DecisionTreeModel/metrics/classification_report.json"
+    metrics_summary: "models/DecisionTreeModel/metrics/metrics_summary.json"
+
+  visualization:
+    base_dir: "models/DecisionTreeModel/visualization/"
+    tree_visualization: "models/DecisionTreeModel/visualization/tree_visualization.png"
+    feature_importance: "models/DecisionTreeModel/visualization/feature_importance.png"
+
+
+predict:
+  config:
+    batch_size: 1000
+    logs:
+      file_path: ".logs/models/{DATE}_decision_tree_predict_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  input:
+    features_path: "data/clean/decision_tree_model/test_features.csv"
+    
+  output:
+    predictions_path: "models/DecisionTreeModel/predictions/predictions.csv"
+    probabilities_path: "models/DecisionTreeModel/predictions/probabilities.csv"

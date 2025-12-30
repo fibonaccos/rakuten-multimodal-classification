@@ -1,0 +1,49 @@
+metadata:
+  name: "decision_tree_preprocessing"
+  description: "Preprocessing pipeline for DecisionTreeClassifier model."
+
+
+preprocessing:
+  config:
+    sample_size: -1  # -1 for all data
+    train_size: 0.8
+    random_state: 42
+    logs:
+      file_path: ".logs/preprocessing/{DATE}_decision_tree_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  input:
+    text_path: "data/raw/X_raw.csv"
+    image_dir: "data/raw/images/"
+    labels_path: "data/raw/Y_raw.csv"
+
+  output:
+    output_dir: "data/clean/decision_tree_model/"
+    train_features: "data/clean/decision_tree_model/train_features.csv"
+    test_features: "data/clean/decision_tree_model/test_features.csv"
+    train_labels: "data/clean/decision_tree_model/train_labels.csv"
+    test_labels: "data/clean/decision_tree_model/test_labels.csv"
+    transformers: "data/clean/decision_tree_model/transformers.pkl"
+
+  steps:
+    # Text preprocessing steps
+    text_cleaning:
+      enable: true
+      lowercase: true
+      remove_punctuation: true
+      remove_stopwords: true
+      
+    tfidf_vectorization:
+      enable: true
+      max_features: 3000
+      ngram_range: [1, 2]
+      min_df: 3
+      max_df: 0.9
+      
+    # Image preprocessing steps  
+    image_features:
+      enable: true
+      extract_color_histograms: true
+      extract_hog_features: false
+      resize_shape: [128, 128]
