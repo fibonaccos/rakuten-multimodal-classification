@@ -1,0 +1,61 @@
+metadata:
+  name: "sgdc_model_config"
+  description: "Configuration for training and inference of SGDClassifier model."
+
+
+train:
+  config:
+    random_state: 42
+    threads: -1  # Use all available cores
+    epochs: 100  # Max iterations for SGD
+    learning_rate: "optimal"  # Learning rate schedule
+    loss: "log_loss"  # Loss function for logistic regression
+    penalty: "l2"  # Regularization
+    alpha: 0.0001  # Regularization strength
+    early_stopping: true
+    validation_fraction: 0.1
+    n_iter_no_change: 5
+    logs:
+      file_path: ".logs/models/{DATE}_sgdc_train_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  data_dir:
+    train_features: "data/clean/sgdc_model/train_features.csv"
+    test_features: "data/clean/sgdc_model/test_features.csv"
+    train_labels: "data/clean/sgdc_model/train_labels.csv"
+    test_labels: "data/clean/sgdc_model/test_labels.csv"
+    transformers: "data/clean/sgdc_model/transformers.pkl"
+
+  artefacts:
+    base_dir: "models/SGDCModel/artefacts/"
+    model_file: "models/SGDCModel/artefacts/sgdc_model.pkl"
+    label_encoder: "models/SGDCModel/artefacts/label_encoder.pkl"
+    training_history: "models/SGDCModel/artefacts/training_history.pkl"
+
+  metrics:
+    base_dir: "models/SGDCModel/metrics/"
+    confusion_matrix: "models/SGDCModel/metrics/confusion_matrix.png"
+    classification_report: "models/SGDCModel/metrics/classification_report.json"
+    metrics_summary: "models/SGDCModel/metrics/metrics_summary.json"
+
+  visualization:
+    base_dir: "models/SGDCModel/visualization/"
+    learning_curves: "models/SGDCModel/visualization/learning_curves.png"
+    feature_importance: "models/SGDCModel/visualization/feature_importance.png"
+
+
+predict:
+  config:
+    batch_size: 1000
+    logs:
+      file_path: ".logs/models/{DATE}_sgdc_predict_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  input:
+    features_path: "data/clean/sgdc_model/test_features.csv"
+    
+  output:
+    predictions_path: "models/SGDCModel/predictions/predictions.csv"
+    probabilities_path: "models/SGDCModel/predictions/probabilities.csv"
