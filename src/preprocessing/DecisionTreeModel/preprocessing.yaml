@@ -5,7 +5,7 @@ metadata:
 
 preprocessing:
   config:
-    sample_size: -1  # FIXED: Utiliser TOUT le dataset au lieu de 500
+    sample_size: 5000  # Test avec 5000 pour validation rapide
     train_size: 0.8
     random_state: 42
     logs:
