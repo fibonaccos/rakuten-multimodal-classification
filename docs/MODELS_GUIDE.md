@@ -7,10 +7,10 @@
 | Modèle | Accuracy | F1-weighted | Surapprentissage | Temps |
 |--------|----------|-------------|------------------|-------|
 | **SGDClassifier** | **69%** ✅ | **68%** ✅ | ❌ Non | ~30s |
-| **DecisionTree** | À tester | À tester | ✅ Fixé (max_depth: 20) | ~5s |
+| **DecisionTree** | **41%** ✅ | **42%** ✅ | ✅ **2.5%** (était 56%) | ~5s |
 | **Transfer Learning** | N/A | N/A | N/A | ~long |
 
-**Verdict**: ✅ **PERFORMANCES BONNES** - SGDC atteint 69% après optimisation!
+**Verdict**: ✅ **PERFORMANCES BONNES** - SGDC 69%, DecisionTree overfitting résolu (56%→2.5%)!
 
 ### Optimisations Appliquées
 

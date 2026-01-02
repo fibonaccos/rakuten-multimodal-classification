@@ -7,10 +7,10 @@ Projet de classification multimodale pour le challenge Rakuten (27 classes, 84K 
 | Modèle | Accuracy* | Forces | Statut |
 |--------|-----------|--------|--------|
 | **SGDClassifier** | **69%** ✅ | Rapide, scalable | ✅ Optimisé |
-| **DecisionTree** | 37% → En cours | Interprétable | ✅ Overfitting fixé |
+| **DecisionTree** | **41%** ✅ | Interprétable | ✅ Overfitting résolu |
 | **Transfer Learning** | N/A | Meilleure performance images | ✅ Disponible |
 
-*Testés sur 5000 échantillons après optimisation. **Performance considérablement améliorée!**
+*Testés sur 5000 échantillons après optimisation. **SGDC: 69%, DecisionTree: 41% (overfitting éliminé!)**
 
 ## 📖 Documentation
 
@@ -56,9 +56,9 @@ models/[Model]/            # Résultats
 1. ✅ **FIXÉ**: Dataset complet configuré (`sample_size: -1` ou 5000+ pour tests)
 2. ✅ **FIXÉ**: Surapprentissage DecisionTree résolu (`max_depth: 20`)
 3. ✅ **FIXÉ**: SGDC optimisé (elasticnet, 8000 features TF-IDF)
-4. 🎯 **Prochaine étape**: Tester DecisionTree avec nouvelles configs
+4. ✅ **TESTÉ**: DecisionTree avec nouvelles configs - overfitting éliminé (56%→2.5%)!
 
-**Résultat**: SGDC atteint **69% accuracy** (au lieu de 42%)!
+**Résultats**: SGDC **69%** accuracy, DecisionTree **41%** (overfitting résolu)!
 
 ---
 
