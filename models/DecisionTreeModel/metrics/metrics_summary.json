@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.37,
+  "train_accuracy": 0.93,
+  "overfitting_gap": 0.56,
+  "f1_macro": 0.24183532257216467,
+  "f1_weighted": 0.3736330949752002,
+  "precision_weighted": 0.40702339181286545,
+  "recall_weighted": 0.37,
+  "n_classes": 27,
+  "n_features": 2532,
+  "tree_depth": 92,
+  "n_leaves": 175
+}

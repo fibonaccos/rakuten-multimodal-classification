@@ -5,7 +5,7 @@ metadata:
 
 preprocessing:
   config:
-    sample_size: -1  # -1 for all data
+    sample_size: 500  # Use 500 samples for testing (change to -1 for all data)
     train_size: 0.8
     random_state: 42
     logs:
@@ -14,9 +14,9 @@ preprocessing:
       date_format: "%Y-%m-%d %H:%M:%S"
 
   input:
-    text_path: "data/raw/X_raw.csv"
-    image_dir: "data/raw/images/"
-    labels_path: "data/raw/Y_raw.csv"
+    text_path: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/X_train_update.csv"
+    image_dir: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/images/images/"
+    labels_path: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/Y_train_CVw08PX.csv"
 
   output:
     output_dir: "data/clean/decision_tree_model/"
