@@ -7,14 +7,15 @@ train:
   config:
     random_state: 42
     threads: -1  # Use all available cores
-    epochs: 100  # Max iterations for SGD
-    learning_rate: "optimal"  # Learning rate schedule
-    loss: "log_loss"  # Loss function for logistic regression
-    penalty: "l2"  # Regularization
-    alpha: 0.0001  # Regularization strength
+    epochs: 150  # FIXED: Augmenté de 100 à 150
+    learning_rate: "optimal"
+    loss: "log_loss"
+    penalty: "elasticnet"  # FIXED: Changé de l2 à elasticnet pour meilleure régularisation
+    alpha: 0.00005  # FIXED: Réduit de 0.0001 à 0.00005 pour moins pénaliser
+    l1_ratio: 0.15  # FIXED: Ajouté pour elasticnet
     early_stopping: true
     validation_fraction: 0.1
-    n_iter_no_change: 5
+    n_iter_no_change: 10  # FIXED: Augmenté de 5 à 10 pour plus de patience
     logs:
       file_path: ".logs/models/{DATE}_sgdc_train_"
       base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
