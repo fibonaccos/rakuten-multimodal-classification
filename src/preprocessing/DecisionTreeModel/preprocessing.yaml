@@ -5,7 +5,7 @@ metadata:
 
 preprocessing:
   config:
-    sample_size: 500  # Use 500 samples for testing (change to -1 for all data)
+    sample_size: -1  # FIXED: Utiliser TOUT le dataset au lieu de 500
     train_size: 0.8
     random_state: 42
     logs:
@@ -36,9 +36,9 @@ preprocessing:
       
     tfidf_vectorization:
       enable: true
-      max_features: 3000
+      max_features: 5000  # FIXED: Augmenté de 3000 à 5000
       ngram_range: [1, 2]
-      min_df: 3
+      min_df: 2  # FIXED: Réduit de 3 à 2 pour garder plus de features
       max_df: 0.9
       
     # Image preprocessing steps  
