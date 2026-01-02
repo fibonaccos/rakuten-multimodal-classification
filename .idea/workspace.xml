@@ -22,6 +22,10 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 0
 }</component>
@@ -36,7 +40,7 @@
     &quot;Python.prepare_colab.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;sgdc__classifier&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;reorg__sgdc__classif&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/git/rakuten-multimodal-classification&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,

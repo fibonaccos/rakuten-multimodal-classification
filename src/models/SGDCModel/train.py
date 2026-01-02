@@ -114,8 +114,10 @@ def train_model(logger):
     # Classification report
     report = classification_report(
         y_test_encoded, y_pred,
+        labels=range(len(label_encoder.classes_)),
         target_names=label_encoder.classes_.astype(str),
-        output_dict=True
+        output_dict=True,
+        zero_division=0
     )
     
     with open(train_config['metrics']['classification_report'], 'w') as f:
