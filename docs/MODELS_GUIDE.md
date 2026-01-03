@@ -2,15 +2,28 @@
 
 ## 📊 Résumé des Performances
 
-### Après Optimisation (5000 échantillons, 27 classes)
+### Après Optimisation Finale (10K échantillons, 27 classes)
 
-| Modèle | Accuracy | F1-weighted | Surapprentissage | Temps |
-|--------|----------|-------------|------------------|-------|
-| **SGDClassifier** | **69%** ✅ | **68%** ✅ | ❌ Non | ~30s |
-| **DecisionTree** | **41%** ✅ | **42%** ✅ | ✅ **2.5%** (était 56%) | ~5s |
-| **Transfer Learning** | N/A | N/A | N/A | ~long |
+| Modèle | Accuracy | F1-weighted | Overfitting Gap | Temps |
+|--------|----------|-------------|-----------------|-------|
+| **SGDClassifier** | **75.4%** ✅ | **75.2%** ✅ | Aucun | ~4min |
+| **Random Forest** | **50.8%** ✅ | **52.0%** ✅ | **4.7%** ✅ | ~30s |
+| DecisionTree (baseline) | 41% | 42% | 2.5% | ~5s |
 
-**Verdict**: ✅ **PERFORMANCES BONNES** - SGDC 69%, DecisionTree overfitting résolu (56%→2.5%)!
+**Verdict**: ✅ **EXCELLENTES PERFORMANCES** - SGDC **75%**, Random Forest **51%**!
+
+### 🎯 Progression des Résultats
+
+**SGDClassifier**:
+- Initial (500): 42%
+- Optimisé (5K): 69%
+- **Final (10K): 75.4%** ✅
+
+**Arbres de Décision**:
+- DecisionTree (5K): 41% (overfitting résolu)
+- **Random Forest (5K): 50.8%** ✅
+
+**Gain total**: 42% → **75.4%** (+33 points, +79% d'amélioration!)
 
 ### Optimisations Appliquées
 
