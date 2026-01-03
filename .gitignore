@@ -185,3 +185,6 @@ logs/
 *.log
 
 .idea
+
+# GitHub workflows and instructions (internal)
+.github/
