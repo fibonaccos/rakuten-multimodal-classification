@@ -1,65 +1,129 @@
 # Rakuten Multimodal Classification
 
-Projet de classification multimodale pour le challenge Rakuten (27 classes, 84K échantillons).
+Projet de classification multimodale pour le challenge Rakuten France : 27 classes de produits, 84 000 échantillons.
 
-## 🎯 Modèles Disponibles
+## Modèles disponibles
 
-| Modèle | Accuracy* | Forces | Statut |
-|--------|-----------|--------|--------|
-| **SGDClassifier** | **75%** 🎯 | Rapide, scalable | ✅ Production Ready |
-| **Random Forest** | **51%** ✅ | Interprétable, stable | ✅ Optimisé |
-| **Transfer Learning** | N/A | Meilleure performance images | ✅ Disponible |
+| Modèle | Accuracy | F1-weighted | Temps | Statut |
+|--------|----------|-------------|-------|--------|
+| **SGDClassifier** | **75.4%** | 75.2% | ~4 min | Production |
+| **Random Forest** | **50.8%** | 52.0% | ~30 sec | Production |
+| **Transfer Learning** | N/A | N/A | N/A | Autre branche |
 
-*Optimisé sur 10K échantillons. **SGDC: 75.4%, Random Forest: 50.8% - Prêts pour présentation!**
+*Résultats sur 10K échantillons d'entraînement, 2K de test*
 
-## 📖 Documentation
+## Documentation
 
-**Tout est dans**: [`docs/MODELS_GUIDE.md`](docs/MODELS_GUIDE.md)
+- **[docs/README.md](docs/README.md)** - Vue d'ensemble de la documentation
+- **[docs/SGDC_MODEL.md](docs/SGDC_MODEL.md)** - Modèle SGDClassifier
+- **[docs/DECISIONTREE_MODEL.md](docs/DECISIONTREE_MODEL.md)** - Modèles DecisionTree et Random Forest
+- **[docs/INTERPRETABILITY.md](docs/INTERPRETABILITY.md)** - Guide d'interprétation des résultats
+- **[docs/PREPROCESSING.md](docs/PREPROCESSING.md)** - Pipeline de preprocessing
 
-- ✅ Comment utiliser les modèles
-- ✅ Interprétation des métriques
-- ✅ Forces et faiblesses
-- ✅ Points d'amélioration prioritaires
-- ✅ Objectifs réalistes
+## Utilisation
 
-## 🚀 Utilisation Rapide
+### SGDClassifier
 
 ```bash
-# SGDClassifier
+# Preprocessing
 python -m src.preprocessing.SGDCModel
+
+# Training
 python -m src.models.SGDCModel --train
 
-# DecisionTree
-python -m src.preprocessing.DecisionTreeModel  
+# Prédiction
+python -m src.models.SGDCModel --predict
+```
+
+### Random Forest / DecisionTree
+
+```bash
+# Preprocessing
+python -m src.preprocessing.DecisionTreeModel
+
+# Training
 python -m src.models.DecisionTreeModel --train
+
+# Prédiction
+python -m src.models.DecisionTreeModel --predict
 ```
 
-## 📊 Structure
+## Structure du projet
 
 ```
-src/
-├── preprocessing/[Model]/  # Pipeline preprocessing
-│   ├── preprocessing.yaml  # Configuration
-│   └── __main__.py        # Exécutable
-└── models/[Model]/        # Modèle
-    ├── model_config.yaml  # Configuration  
-    └── __main__.py        # Training/Predict
-
-models/[Model]/            # Résultats
-├── artefacts/            # Modèles entraînés
-├── metrics/              # Métriques + confusion matrix
-└── visualization/        # Feature importance
+.
+├── data/                      # Données (non versionnées)
+│   ├── raw/                   # Données brutes
+│   └── processed/             # Features extraites
+├── docs/                      # Documentation
+├── logs/                      # Logs d'exécution
+├── models/                    # Modèles entraînés (non versionnés)
+│   ├── SGDCModel/
+│   │   ├── artefacts/         # Modèles .pkl
+│   │   ├── metrics/           # Métriques JSON, confusion matrix
+│   │   └── visualization/     # Feature importance
+│   └── DecisionTreeModel/
+│       └── ...
+├── src/
+│   ├── preprocessing/         # Pipelines de preprocessing
+│   │   ├── SGDCModel/
+│   │   └── DecisionTreeModel/
+│   ├── models/                # Modèles de classification
+│   │   ├── SGDCModel/
+│   │   └── DecisionTreeModel/
+│   └── visualization/         # Utilitaires de visualisation
+└── requirements.txt           # Dépendances Python
 ```
 
-## ⚠️ Actions Prioritaires
+## Configuration
 
-1. ✅ **OPTIMISÉ**: Dataset 10K échantillons
-2. ✅ **OPTIMISÉ**: SGDC atteint **75.4% accuracy**  
-3. ✅ **NOUVEAU**: Random Forest à **50.8% accuracy**
-4. ✅ **VALIDÉ**: Surapprentissage éliminé sur tous les modèles
+Chaque modèle dispose de deux fichiers YAML de configuration :
 
-**Résultats Finaux**: SGDC **75.4%**, Random Forest **50.8%** - Temps total: ~5min!
+- **preprocessing.yaml** : Paramètres du preprocessing (sample size, TF-IDF, images)
+- **model_config.yaml** : Hyperparamètres du modèle (régularisation, profondeur, etc.)
 
----
+Voir la documentation spécifique à chaque modèle pour les détails.
 
-**Voir [`docs/MODELS_GUIDE.md`](docs/MODELS_GUIDE.md) pour le guide complet**
+## Résultats
+
+### SGDClassifier (75.4%)
+
+- Modèle linéaire avec régularisation elasticnet
+- Excelle sur données textuelles (TF-IDF haute dimension)
+- Aucun surapprentissage
+- Scalable au dataset complet
+
+### Random Forest (50.8%)
+
+- Ensemble de 50 arbres de décision
+- Bonne interprétabilité
+- Surapprentissage contrôlé (gap 4.7%)
+- Utile pour analyse des features
+
+### Comparaison
+
+SGDC surperforme car les données textuelles créent un espace linéairement séparable en haute dimension. Random Forest reste pertinent pour l'interprétabilité et la compréhension des features importantes.
+
+## Installation
+
+```bash
+# Créer environnement virtuel
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Installer dépendances
+pip install -r requirements.txt
+```
+
+## Dépendances principales
+
+- Python >= 3.8
+- scikit-learn >= 1.0
+- pandas >= 1.3
+- numpy >= 1.21
+- opencv-python >= 4.5
+- matplotlib >= 3.4
+
+## Auteurs
+
+Projet DataScientest - Groupe Rakuten
