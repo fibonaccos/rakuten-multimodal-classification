@@ -52,6 +52,7 @@ def predict(logger, input_features=None):
         'prediction': predictions,
         'prediction_encoded': predictions_encoded
     }, index=input_features.index)
+    predictions_df.index.name = 'id'
     
     predictions_df.to_csv(predict_config['output']['predictions_path'])
     
@@ -60,6 +61,7 @@ def predict(logger, input_features=None):
         columns=label_encoder.classes_,
         index=input_features.index
     )
+    proba_df.index.name = 'id'
     proba_df.to_csv(predict_config['output']['probabilities_path'])
     logger.info("Probabilities saved")
     
