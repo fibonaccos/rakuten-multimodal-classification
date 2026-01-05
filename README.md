@@ -7,7 +7,8 @@ Projet de classification multimodale pour le challenge Rakuten France : 27 class
 | Modèle | Accuracy | F1-weighted | Temps | Statut |
 |--------|----------|-------------|-------|--------|
 | **SGDClassifier** | **75.4%** | 75.2% | ~4 min | Production |
-| **Random Forest** | **50.8%** | 52.0% | ~30 sec | Production |
+| **Random Forest** | **50.8%** | 52.0% | ~30 sec | Branche reorg_sgdc_classif |
+| **DecisionTree** | **40.9%** | 42.3% | ~5 sec | Baseline interprétable |
 | **Transfer Learning** | N/A | N/A | N/A | Autre branche |
 
 *Résultats sur 10K échantillons d'entraînement, 2K de test*

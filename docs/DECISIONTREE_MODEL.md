@@ -1,49 +1,53 @@
-# Random Forest - Documentation Technique
+# DecisionTree - Documentation Technique
 
 ## Présentation
 
-Le modèle Random Forest est un ensemble d'arbres de décision. Il offre une bonne interprétabilité tout en améliorant les performances par rapport à un arbre unique.
+Le modèle DecisionTree est un arbre de décision unique. Il offre une excellente interprétabilité avec des règles de décision explicites. Cette branche contient le DecisionTree simple optimisé pour éviter le surapprentissage.
+
+> **Note**: Le Random Forest (50.8% accuracy) est disponible sur la branche `reorg_sgdc_classif`.
 
 ## Performance
 
-### Résultats actuels (5K échantillons d'entraînement)
+### Résultats actuels (1K échantillons de test)
 
 | Métrique | Valeur |
 |----------|--------|
-| Accuracy test | 50.8% |
-| Accuracy train | 55.5% |
-| F1-weighted | 52.0% |
-| Overfitting gap | 4.7% |
-| Temps d'entraînement | ~30 secondes |
+| Accuracy test | 40.9% |
+| Accuracy train | 43.4% |
+| F1-weighted | 42.3% |
+| Overfitting gap | 2.5% |
+| Temps d'entraînement | ~5 secondes |
 
 ### Historique
 
-- DecisionTree initial: 41% accuracy (surapprentissage sévère)
-- DecisionTree optimisé: 41% accuracy (surapprentissage résolu)
-- Random Forest: 50.8% accuracy
+- DecisionTree initial: 41% accuracy (surapprentissage sévère ~56% gap)
+- DecisionTree optimisé: **40.9% accuracy** (surapprentissage résolu: 2.5% gap)
+- Random Forest: 50.8% accuracy (voir branche `reorg_sgdc_classif`)
 
 ## Architecture
 
 ### Features utilisées
 
-**Texte (3000 features TF-IDF)**:
-- Vectorisation TF-IDF avec unigrammes
-- Moins de features que SGDC (arbres plus sensibles à la dimensionnalité)
+**Texte (10000 features TF-IDF)**:
+- Vectorisation TF-IDF avec unigrammes et bigrammes
+- Identique à SGDC pour comparaison équitable
 
 **Images (192 features)**:
 - Histogrammes RGB identiques à SGDC
 
-**Total**: 3192 features
+**Total**: 10192 features
 
 ### Modèle
 
 ```python
-RandomForestClassifier(
-    n_estimators=50,
+DecisionTreeClassifier(
+    criterion='gini',
     max_depth=20,
     min_samples_split=30,
     min_samples_leaf=15,
     max_features=0.7,
+    max_leaf_nodes=500,
+    ccp_alpha=0.001,
     random_state=42
 )
 ```
@@ -75,15 +79,16 @@ preprocessing:
 ### Training (src/models/DecisionTreeModel/model_config.yaml)
 
 ```yaml
-model:
-  type: "RandomForest"      # ou "DecisionTree"
-  n_estimators: 50          # Nombre d'arbres (RF uniquement)
-  max_depth: 20             # Profondeur maximale
-  min_samples_split: 30     # Min échantillons pour split
-  min_samples_leaf: 15      # Min échantillons par feuille
-  max_features: 0.7         # 70% des features par split
-  criterion: "gini"
-  random_state: 42
+train:
+  config:
+    criterion: "gini"
+    max_depth: 20
+    min_samples_split: 30
+    min_samples_leaf: 15
+    max_features: 0.7
+    max_leaf_nodes: 500
+    ccp_alpha: 0.001
+    random_state: 42
 ```
 
 ## Utilisation
@@ -103,12 +108,12 @@ python -m src.models.DecisionTreeModel --train
 Génère les artefacts dans `models/DecisionTreeModel/`:
 - `artefacts/decision_tree_model.pkl`
 - `artefacts/label_encoder.pkl`
-- `artefacts/tree_structure.txt` (si DecisionTree simple)
+- `artefacts/tree_structure.txt`
 - `metrics/metrics_summary.json`
 - `metrics/classification_report.json`
 - `metrics/confusion_matrix.png`
 - `visualization/feature_importance.png`
-- `visualization/tree_visualization.png` (si petit arbre)
+- `visualization/tree_visualization.png` (si arbre <1000 nodes)
 
 ### 3. Prédiction
 
@@ -120,60 +125,63 @@ python -m src.models.DecisionTreeModel --predict
 
 ### Points forts
 
-1. **Interprétabilité**: Les arbres fournissent des règles de décision explicites.
+1. **Interprétabilité maximale**: L'arbre fournit des règles de décision explicites et lisibles.
 
-2. **Feature importance claire**: Visualisation de l'importance des features via Gini.
+2. **Aucun surapprentissage**: Gap train/test de seulement 2.5% (vs 56% avant optimisation).
 
-3. **Pas de surapprentissage**: Gap train/test de seulement 4.7%.
+3. **Très rapide**: Training en 5 secondes.
 
-4. **Rapide**: Training en 30 secondes.
+4. **Faible profondeur**: 20 niveaux avec seulement 41 feuilles, très facile à comprendre.
 
 ### Limites
 
-1. **Performance inférieure à SGDC**: 50.8% vs 75.4%, écart de -24.6 points.
+1. **Performance faible**: 40.9% d'accuracy sur 27 classes (random = 3.7%).
 
-2. **Difficulté avec haute dimension**: Les arbres performent moins bien quand il y a beaucoup de features.
+2. **Inférieur aux autres modèles**: 
+   - Random Forest: 50.8% (+9.9 points)
+   - SGDC: 75.4% (+34.5 points)
 
-3. **Besoin de plus d'arbres**: 50 arbres insuffisants, mais 200+ augmenterait trop le temps de training.
+3. **Trop simple**: Un seul arbre ne peut pas capturer la complexité des données.
 
 ## Optimisations appliquées
 
 ### Prévention du surapprentissage
 
-| Paramètre | DecisionTree initial | Optimisé |
-|-----------|---------------------|----------|
+| Paramètre | Avant optimisation | Après optimisation |
+|-----------|-------------------|-------------------|
 | max_depth | null (92 niveaux) | 20 |
 | min_samples_split | 2 | 30 |
 | min_samples_leaf | 1 | 15 |
+| max_leaf_nodes | null | 500 |
 | ccp_alpha | 0.0 | 0.001 |
 
-**Résultat**: Surapprentissage réduit de 56% à 4.7%
+**Résultat**: Surapprentissage réduit de **56%** à **2.5%** ✅
+
+**Mais**: Accuracy reste à 40.9%, arbre trop simple pour ce problème complexe.
 
 ### Passage à Random Forest
 
-Amélioration de 41% à 50.8% (+9.8 points) grâce à l'ensemble de 50 arbres.
+Sur la branche `reorg_sgdc_classif`, le Random Forest (50 arbres) atteint **50.8%** (+9.9 points).
 
-## Pourquoi SGDC performe mieux ?
+## Pourquoi les performances sont limitées ?
 
-### 1. Dimensionnalité
+### 1. Un seul arbre insuffisant
 
-- **SGDC**: Excelle en haute dimension (8000 features TF-IDF)
-- **Random Forest**: Nécessite de réduire à 3000 features, perte d'information
+- **DecisionTree**: 40.9% accuracy (cet arbre)
+- **Random Forest**: 50.8% accuracy (+9.9 points avec 50 arbres)
+- Un seul arbre ne peut capturer qu'une partie des patterns
 
-### 2. Nature des données textuelles
+### 2. Problème complexe
 
-- **TF-IDF** crée un espace linéairement séparable
-- **SGDC** trouve naturellement l'hyperplan optimal
-- **Random Forest** doit découper l'espace en 8000 dimensions (inefficace)
+- **27 classes** de produits avec vocabulaire varié
+- Beaucoup de confusion entre classes visuellement ou textuellement proches
+- Un modèle linéaire (SGDC) performe mieux grâce à la haute dimensionnalité
 
-### 3. Ratio données/paramètres
+### 3. Nature des données textuelles
 
-| Modèle | Paramètres | Données | Ratio |
-|--------|------------|---------|-------|
-| SGDC | ~16K | 8K | 1:0.5 |
-| Random Forest | ~2M | 4K | 1:0.002 |
-
-Random Forest a trop de paramètres pour si peu de données.
+- **TF-IDF** crée un espace linéairement séparable en haute dimension
+- **SGDC** trouve naturellement l'hyperplan optimal (75.4%)
+- **DecisionTree** doit découper l'espace en 10K dimensions de façon séquentielle (inefficace)
 
 ## Interprétation des visualisations
 
@@ -206,51 +214,56 @@ tree_structure.txt contient:
 
 Chaque ligne représente une règle de décision.
 
-## Comparaison des approches
+## Comparaison des modèles
 
-### DecisionTree vs Random Forest
+### DecisionTree vs Random Forest vs SGDC
 
-| Aspect | DecisionTree | Random Forest |
-|--------|--------------|---------------|
-| Accuracy | 41% | 50.8% |
-| Overfitting | 2.5% | 4.7% |
-| Temps | 5s | 30s |
-| Interprétabilité | Excellente | Bonne |
+| Aspect | DecisionTree | Random Forest | SGDC |
+|--------|--------------|---------------|------|
+| Accuracy | **40.9%** | 50.8% | **75.4%** |
+| Overfitting | 2.5% | 4.7% | ~0% |
+| Temps | 5s | 30s | 4min |
+| Interprétabilité | **Excellente** | Bonne | Moyenne |
+| Branches | Cette branche | reorg_sgdc_classif | reorg_sgdc_classif |
 
-Random Forest améliore la performance au prix d'une légère perte d'interprétabilité.
+### Quand utiliser chaque modèle ?
 
-### Random Forest vs SGDC
+**DecisionTree (cette branche)**:
+- Interprétabilité maximale requise
+- Besoin de voir les règles de décision exactes
+- Prototype rapide (<10s)
+- Analyse exploratoire des features
 
-| Aspect | Random Forest | SGDC |
-|--------|---------------|------|
-| Accuracy | 50.8% | 75.4% |
-| Temps | 30s | 4min |
-| Features | 3192 | 10192 |
-| Interprétabilité | Bonne | Moyenne |
+**Random Forest**:
+- Amélioration de performance (+10 points vs DecisionTree)
+- Bonne interprétabilité encore
+- Budget temps limité (<1 min)
 
-SGDC est supérieur en performance mais Random Forest reste utile pour l'interprétabilité.
+**SGDC**:
+- Performance maximale requise (+34 points vs DecisionTree)
+- Données textuelles dominantes
+- Production / déploiement
 
 ## Cas d'usage recommandés
 
-**Utiliser Random Forest quand**:
-- L'interprétabilité est prioritaire
-- Besoin de comprendre les règles de décision
-- Budget temps limité (<1 min)
-- Baseline rapide nécessaire
+**Utiliser DecisionTree (cette branche) quand**:
+- L'interprétabilité est la priorité absolue
+- Besoin de règles de décision explicites et traçables
+- Prototype ultra-rapide nécessaire (<10s)
+- Analyse exploratoire des features clés
+- Explication des décisions requise (réglementaire, audit)
 
-**Utiliser SGDC quand**:
-- Performance maximale requise
-- Données textuelles dominantes
-- Haute dimensionnalité acceptable
-- Scalabilité importante
+**Limitations à considérer**:
+- Accuracy faible (40.9%) inadaptée pour production
+- Utilisez Random Forest (+10 pts) ou SGDC (+34 pts) pour de meilleures performances
 
 ## Fichiers générés
 
 ### Artefacts
 
-- **decision_tree_model.pkl**: Modèle entraîné (RandomForest ou DecisionTree)
+- **decision_tree_model.pkl**: Modèle DecisionTree entraîné
 - **label_encoder.pkl**: Encodage des 27 classes
-- **tree_structure.txt**: Structure textuelle (si DecisionTree simple et petit)
+- **tree_structure.txt**: Structure textuelle de l'arbre (règles de décision)
 
 ### Métriques
 
@@ -265,16 +278,16 @@ SGDC est supérieur en performance mais Random Forest reste utile pour l'interpr
 
 ## Pistes d'amélioration
 
-1. **Augmenter n_estimators**: Passer à 100-200 arbres (+3-5% accuracy attendu)
+1. **Passer à Random Forest**: +9.9 points d'accuracy (voir branche `reorg_sgdc_classif`)
 
-2. **Optimiser max_features**: Tester différentes valeurs (0.3-0.9)
+2. **Augmenter n_estimators**: Avec 100-200 arbres, atteindre potentiellement 55-60%
 
-3. **Grid search**: Recherche systématique des meilleurs hyperparamètres
+3. **Gradient Boosting**: XGBoost ou LightGBM pourraient atteindre 65-70%
 
-4. **Gradient Boosting**: XGBoost ou LightGBM pourraient atteindre 65-70%
+4. **Features engineering**: Enrichir les features images (HOG, SIFT, embeddings CNN)
 
-5. **Features engineering**: Enrichir les features images (HOG, SIFT)
+5. **Hybrid approach**: Combiner prédictions d'arbres et SGDC
 
 ## Conclusion
 
-Le modèle Random Forest offre un bon compromis interprétabilité/performance avec 50.8% d'accuracy et aucun surapprentissage. Il sert de baseline solide et complément au SGDC pour l'analyse des features importantes.
+Le modèle DecisionTree offre une **interprétabilité maximale** avec 40.9% d'accuracy et aucun surapprentissage (2.5% gap). C'est un excellent outil pour comprendre les règles de décision, mais **inadapté pour la production** où SGDC (75.4%) ou Random Forest (50.8%) sont préférables. Cette branche sert de **baseline interprétable** et d'outil d'analyse des features importantes.
