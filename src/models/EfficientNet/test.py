@@ -200,5 +200,5 @@ plt.xticks(rotation=40, ha='right')  # Rotation à 45 degrés
 plt.ylabel("Classes Réelles", size=14)
 
 # Enregistrement de la matrice de confusion en tant qu'image
-plt.savefig(f"{ANCR_DIR}/reports/EfficientNet/figures/matrice_de_confusion.png")
+plt.savefig(f"{ANCR_DIR}/reports/EfficientNet/figures/confusion_matrix.png")
 plt.show()
