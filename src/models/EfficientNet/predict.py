@@ -107,13 +107,23 @@ def predict_efficientNet(img_dir) :
         idx = 0
         # Afficher les images avec les classes et probabilités
         for i in range(images.size(0)):
-            # Récupérer l'image
+            # Récupérer le tenseur d'image depuis le batch
             img_tensor = images[i].cpu().detach()
-            img_numpy = img_tensor.permute(1, 2, 0).numpy()
 
-            # Normaliser l'image
-            img_numpy = (img_numpy - img_numpy.min()) / (img_numpy.max() - img_numpy.min())
+            # Convertir le tenseur en un format numpy
+            img_numpy = img_tensor.permute(1, 2, 0).numpy()  # Changer l'ordre des dimensions (C, H, W) à (H, W, C)
+
+            # Dé-normaliser l'image en utilisant les valeurs moyennes et les écarts-types utilisés dans la normalisation
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            img_numpy = img_numpy * std + mean  # Revert la normalisation
+
+            # Clip les valeurs pour s'assurer qu'elles sont entre 0 et 1
+            img_numpy = np.clip(img_numpy, 0, 1)  
+
+            # Convertir de [0, 1] à [0, 255] et changer en entier 8 bits
             img_numpy = (img_numpy * 255).astype(np.uint8)
+
 
             # Récupération de la prédiction de l'image
             predicted_class = all_predictions[-images.size(0) + i]
@@ -123,16 +133,18 @@ def predict_efficientNet(img_dir) :
             text = f'Class: {mapped_class}, Prob: {probability:.2f}'
 
             # Créer une nouvelle figure pour sauvegarder
-            plt.figure()
-            plt.imshow(img_numpy)
-            plt.title(text)  # Mettre le titre avec la classe et la probabilité
-            plt.axis('off') 
+            # Créer une nouvelle figure pour sauvegarder
+            fig, ax = plt.subplots(1, 1)  # Modifier en (1, 1) au lieu de ((1, 1))
+            ax.imshow(img_numpy)
+            ax.set_title(text)  # Mettre le titre avec la classe et la probabilité
+            ax.axis('off')  # Ne pas afficher les axes
 
-            # Sauvegarder l'image
-            os.makedirs(f"{img_dir}image_predict", exist_ok=True)
-            file_name = f'predicted_{filename[idx]}'
-            plt.savefig(os.path.join(f"{img_dir}image_predict", file_name), bbox_inches='tight', pad_inches=0)
-            plt.close()
+            # Sauvegarder l'image dans le répertoire approprié
+            os.makedirs(os.path.join(img_dir, 'image_predict'), exist_ok=True)  # Utiliser os.path.join pour une bonne construction de chemin
+            file_name = f'predicted_{filename[idx]}'  # Construire le nom du fichier
+            fig.savefig(os.path.join(img_dir, 'image_predict', file_name), bbox_inches='tight', pad_inches=0)  # Sauvegarder la figure
+            plt.close(fig)  # Fermer la figure pour libérer la mémoire
+
 
             idx += 1
 
