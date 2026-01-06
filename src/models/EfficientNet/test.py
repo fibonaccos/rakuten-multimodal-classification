@@ -93,6 +93,7 @@ X_val_df, X_test_df, y_val_df, y_test_df = train_test_split(X_val_df, y_val_df, 
 
 # Encoder les labels
 label_encoder = LabelEncoder()
+y_train_df['prdtypecode_old'] = y_train_df['prdtypecode']
 y_train_df['prdtypecode'] = label_encoder.fit_transform(y_train_df['prdtypecode'])
 y_val_df['prdtypecode'] = label_encoder.transform(y_val_df['prdtypecode'])
 y_test_df['prdtypecode'] = label_encoder.transform(y_test_df['prdtypecode'])
@@ -155,7 +156,7 @@ encoded_classes = y_train_df['prdtypecode'].unique()
 print("Classes encodées :", encoded_classes)
 
 # Affichage des classes après encodage
-original_classes = label_encoder.classes_
+original_classes = y_train_df['prdtypecode_old'].unique()
 print("Classes d'origine :", original_classes)
 
 # Créer le mapping
