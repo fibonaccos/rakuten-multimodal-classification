@@ -7,11 +7,10 @@ import torch.optim as optim
 from torchvision import transforms, models
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import time
 import random
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont  # Pour dessiner sur l'image
 
 # Fixer les graines aléatoires
 seed = 42  # Vous pouvez choisir n'importe quel entier ici
@@ -19,36 +18,31 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-# Ajustez l'affichage pour afficher toutes les colonnes
-pd.set_option('display.max_columns', None)  # Affiche toutes les colonnes
-pd.set_option('display.expand_frame_repr', False)  # Ne pas couper les lignes
-
 # Constants
 IMAGE_SIZE = (224, 224)  # Dimension des images
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-ANCR_DIR = "/content/drive/MyDrive/Colab Notebooks/rakuten_projet/"
+ANCR_DIR = "./"
 IMG_TEST_DIR = ANCR_DIR+'data/images/image_test/'
 
 # Affichage des classes après encodage
-encoded_classes = [18, 19, 16, 5, 8, 25, 11, 4, 23, 9, 13, 14, 22, 7, 21, 0, 24, 3, 6, 2, 15, 26, 10, 12, 1, 17, 20]
-print("Classes encodées :", encoded_classes)
+encoded_classes = [18, 19, 16, 5, 8, 
+                   25, 11, 4, 23, 9, 
+                   13, 14, 22, 7, 21, 
+                   0, 24, 3, 6, 2, 
+                   15, 26, 10, 12, 1, 
+                   17, 20]
 
 # Affichage des classes d'origine
-original_classes = [2280, 2403, 2060, 1160, 1281, 2705, 1302, 1140, 2583, 1300, 1560, 1920, 
- 2582, 1280, 2522, 10, 2585, 60, 1180, 50, 1940, 2905, 1301, 1320, 40, 
- 2220, 2462]
-print("Classes d'origine :", original_classes)
+original_classes = [2280, 2403, 2060, 1160, 1281, 
+                    2705, 1302, 1140, 2583, 1300, 
+                    1560, 1920, 2582, 1280, 2522, 
+                    10, 2585, 60, 1180, 50, 
+                    1940, 2905, 1301, 1320, 40, 
+                    2220, 2462]
 
 # Créer le mapping
 label_mapping = dict(zip(encoded_classes, original_classes))
-
-# Transformations des données
-transform_test = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
 
 # Transformations des données
 transform_test = transforms.Compose([
@@ -86,7 +80,7 @@ class CustomImageDataset(Dataset):
 class EfficientNetModel(nn.Module):
     def __init__(self, num_classes):
         super(EfficientNetModel, self).__init__()
-        self.model = models.efficientnet_b0(pretrained=True)  # Charger EfficientNet avec des poids pré-entraînés
+        self.model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)  # Charger EfficientNet avec des poids pré-entraînés
         self.model.classifier[1] = nn.Linear(self.model.classifier[1].in_features, num_classes)  # Adapter la dernière couche
 
     def forward(self, x):
@@ -107,7 +101,7 @@ def predict_classe(img_dir) :
   except Exception:
       pass
 
-  model.load_state_dict(torch.load(f'{ANCR_DIR}models/model_efficientNet.pth'))
+  model.load_state_dict(torch.load(f'{ANCR_DIR}models/EfficientNet/model_efficientNet.pth', map_location=DEVICE))
   model.eval()  # Passer en mode évaluation
   with torch.no_grad():
     all_predictions = []
@@ -131,15 +125,12 @@ def predict_classe(img_dir) :
         idx = 0
         # Afficher les images avec les classes et probabilités
         for i in range(images.size(0)):
-            # Récupérer l'image et la normaliser
-            img_tensor = images[i].cpu().detach() # Obtention du tenseur d'image
+            img_tensor = images[i].cpu().detach()  # Obtention du tenseur d'image
             img_numpy = img_tensor.permute(1, 2, 0).numpy()  # Changer l'ordre des dimensions
 
-            # Normaliser l'image (selon l'échelle de torchvision)
+            # Normaliser l'image
             img_numpy = (img_numpy - img_numpy.min()) / (img_numpy.max() - img_numpy.min())  # Normaliser entre 0 et 1
-
-            # Convertir en entier 8 bits
-            img_numpy = (img_numpy * 255).astype(np.uint8)
+            img_numpy = (img_numpy * 255).astype(np.uint8)  # Convertir en entier 8 bits
 
             # Ajouter le texte directement sur le tenseur ou calculer la position pour l'affichage
             predicted_class = all_predictions[-images.size(0) + i]
@@ -153,18 +144,17 @@ def predict_classe(img_dir) :
             plt.imshow(img_numpy)
             plt.title(text)  # Mettre le titre avec la classe et la probabilité
             plt.axis('off')  # Ne pas afficher les axes
-            #plt.show()
 
             # Sauvegarder l'image
-            os.makedirs(f"{IMG_TEST_DIR}image_predict", exist_ok=True)
+            os.makedirs(f"{img_dir}image_predict", exist_ok=True)
             file_name = f'predicted_{filename[idx]}'  # Nommez le fichier comme bon vous semble
-            print(f"{file_name}")
-            plt.savefig(os.path.join(f"{IMG_TEST_DIR}image_predict", file_name), bbox_inches='tight', pad_inches=0)
+            plt.savefig(os.path.join(f"{img_dir}image_predict", file_name), bbox_inches='tight', pad_inches=0)
             plt.close()  # Fermer la figure
 
             idx += 1
 
-
-    print(f"Images prédites enregistrées")
+    print(f"Images prédites enregistrées dans le dossier : {img_dir}")
+    
+    return(1)
 
 predictions = predict_classe(IMG_TEST_DIR)
