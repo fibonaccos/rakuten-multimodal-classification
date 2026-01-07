@@ -7,6 +7,12 @@ from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import random
 import matplotlib.pyplot as plt
+import time
+import sys
+import torch._dynamo
+import gc
+
+torch._dynamo.config.suppress_errors = True
 
 # Reproductibility
 seed = 42  
@@ -71,86 +77,100 @@ class EfficientNetModel(nn.Module):
 
 # Prediction with EfficientNet
 def predict_efficientNet(img_dir) :
-  # Charger les datasets
-  test_dataset = CustomImageDataset(img_dir, transform=transform_test)
-  test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    t0 = time.time()
+    # Charger les datasets
+    test_dataset = CustomImageDataset(img_dir, transform=transform_test)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=0)
 
-  # Chargement du modèle
-  model = EfficientNetModel(num_classes=27)
-  model.to(DEVICE)
-  try:
-      model = torch.compile(model)
-  except Exception:
-      pass
+    # Chargement du modèle
+    model = EfficientNetModel(num_classes=27)
+    model.to(DEVICE)
+    try:
+        model = torch.compile(model)
+    except Exception:
+        pass
 
-  model.load_state_dict(torch.load(f'{ANCR_DIR}models/EfficientNet/model_efficientNet.pth', map_location=DEVICE))
+    model.load_state_dict(torch.load(f'{ANCR_DIR}models/EfficientNet/model_efficientNet.pth', map_location=DEVICE))
   
-  # Prédiction du modèle
-  model.eval()  # Passer en mode évaluation
-  with torch.no_grad():
-    all_predictions = []
-    all_probabilities = []
+    # Prédiction du modèle
+    model.eval()  # Passer en mode évaluation
+    print("ok0")
+    #sys.exit(0) : ok
+    with torch.no_grad():
+        all_predictions = []
+        all_probabilities = []
+        #sys.exit(0) : ok
 
-    for images, filename in test_loader:
-        # Récupération des images à tester
-        images = images.to(DEVICE)
-        outputs = model(images)
+        for images, filename in test_loader:
+            # Récupération des images à tester
+            images = images.to(DEVICE)
+            print("ok1")
+            #sys.exit(0) : ok
 
-        # Obtenir les probabilités et les classes prédites
-        probabilities = torch.softmax(outputs, dim=1)
-        _, predicted = torch.max(probabilities.data, 1)
+            outputs = model(images)
+            print("ok2")
 
-        # Rassembler les prédictions et les probabilités
-        all_predictions.extend(predicted.cpu().numpy())
-        all_probabilities.extend(probabilities.cpu().detach().numpy())
+            # Obtenir les probabilités et les classes prédites
+            probabilities = torch.softmax(outputs, dim=1)
+            _, predicted = torch.max(probabilities.data, 1)
 
-        idx = 0
-        # Afficher les images avec les classes et probabilités
-        for i in range(images.size(0)):
-            # Récupérer le tenseur d'image depuis le batch
-            img_tensor = images[i].cpu().detach()
+            # Rassembler les prédictions et les probabilités
+            all_predictions.extend(predicted.cpu().numpy())
+            all_probabilities.extend(outputs.cpu().detach().numpy())
+            #sys.exit(0)
 
-            # Convertir le tenseur en un format numpy
-            img_numpy = img_tensor.permute(1, 2, 0).numpy()  # Changer l'ordre des dimensions (C, H, W) à (H, W, C)
+            idx = 0
+            # Afficher les images avec les classes et probabilités
+            print("ok3")
+            for i in range(images.size(0)):
+                # Récupérer le tenseur d'image depuis le batch
+                img_tensor = images[i].cpu().detach()
 
-            # Dé-normaliser l'image en utilisant les valeurs moyennes et les écarts-types utilisés dans la normalisation
-            mean = np.array([0.485, 0.456, 0.406])
-            std = np.array([0.229, 0.224, 0.225])
-            img_numpy = img_numpy * std + mean  # Revert la normalisation
+                # Convertir le tenseur en un format numpy
+                img_numpy = img_tensor.permute(1, 2, 0).numpy()  # Changer l'ordre des dimensions (C, H, W) à (H, W, C)
 
-            # Clip les valeurs pour s'assurer qu'elles sont entre 0 et 1
-            img_numpy = np.clip(img_numpy, 0, 1)  
+                # Dé-normaliser l'image en utilisant les valeurs moyennes et les écarts-types utilisés dans la normalisation
+                mean = np.array([0.485, 0.456, 0.406])
+                std = np.array([0.229, 0.224, 0.225])
+                img_numpy = img_numpy * std + mean  # Revert la normalisation
 
-            # Convertir de [0, 1] à [0, 255] et changer en entier 8 bits
-            img_numpy = (img_numpy * 255).astype(np.uint8)
+                # Clip les valeurs pour s'assurer qu'elles sont entre 0 et 1
+                img_numpy = np.clip(img_numpy, 0, 1)  
 
+                # Convertir de [0, 1] à [0, 255] et changer en entier 8 bits
+                img_numpy = (img_numpy * 255).astype(np.uint8)
 
-            # Récupération de la prédiction de l'image
-            predicted_class = all_predictions[-images.size(0) + i]
-            # Mapper les valeurs
-            mapped_class = label_mapping[predicted_class]
-            probability = all_probabilities[-images.size(0) + i][predicted_class]
-            text = f'Class: {mapped_class}, Prob: {probability:.2f}'
+                # Récupération de la prédiction de l'image
+                predicted_class = all_predictions[-images.size(0) + i]
+                # Mapper les valeurs
+                mapped_class = label_mapping[predicted_class]
+                probability = all_probabilities[-images.size(0) + i][predicted_class]
+                text = f'Class: {mapped_class}, Prob: {probability:.2f}'
 
-            # Créer une nouvelle figure pour sauvegarder
-            # Créer une nouvelle figure pour sauvegarder
-            fig, ax = plt.subplots(1, 1)  # Modifier en (1, 1) au lieu de ((1, 1))
-            ax.imshow(img_numpy)
-            ax.set_title(text)  # Mettre le titre avec la classe et la probabilité
-            ax.axis('off')  # Ne pas afficher les axes
+                # Créer une nouvelle figure pour sauvegarder
+                fig, ax = plt.subplots(1, 1)  # Modifier en (1, 1) au lieu de ((1, 1))
+                ax.imshow(img_numpy)
+                ax.set_title(text)  # Mettre le titre avec la classe et la probabilité
+                ax.axis('off')  # Ne pas afficher les axes
 
-            # Sauvegarder l'image dans le répertoire approprié
-            os.makedirs(os.path.join(img_dir, 'image_predict'), exist_ok=True)  # Utiliser os.path.join pour une bonne construction de chemin
-            file_name = f'predicted_{filename[idx]}'  # Construire le nom du fichier
-            fig.savefig(os.path.join(img_dir, 'image_predict', file_name), bbox_inches='tight', pad_inches=0)  # Sauvegarder la figure
-            plt.close(fig)  # Fermer la figure pour libérer la mémoire
+                # Sauvegarder l'image dans le répertoire approprié
+                os.makedirs(os.path.join(img_dir, 'image_predict'), exist_ok=True)  # Utiliser os.path.join pour une bonne construction de chemin
+                file_name = f'predicted_{filename[idx]}'  # Construire le nom du fichier
+                print(file_name)
+                fig.savefig(os.path.join(img_dir, 'image_predict', file_name), bbox_inches='tight', pad_inches=0)  # Sauvegarder la figure
+                plt.close(fig)  # Fermer la figure pour libérer la mémoire
 
+                idx += 1
+                print("ok4")
+            print("ok5")
 
-            idx += 1
+        print(f"Images prédites enregistrées dans le dossier : {img_dir}")
 
-    print(f"Images prédites enregistrées dans le dossier : {img_dir}")
+    print("ok6")
+    t1 = time.time()
+    return(f"Prédiction réalisée en {(t1 - t0):.2f} secondes") #: pas ok)
 
-    return(True)
-
-predictions = predict_efficientNet(IMG_TEST_DIR)
+#predictions = predict_efficientNet(IMG_TEST_DIR)
+print("ok7")
+#sys.exit(0)
 
