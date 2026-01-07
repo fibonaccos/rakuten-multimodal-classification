@@ -1,0 +1,84 @@
+metadata:
+  name: "tl_model_config"
+  description: "Configuration for building, training and inference of transfer learning model."
+
+
+build:
+  config:
+    name: "resnet101v2-tl"
+    random_state: 42
+    logs:
+      file_path: ".logs/models/{DATE}_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+  network:
+    input_shape: [128, 128, 3]
+    n_classes: 27
+    head:
+      units: 128
+      depth: 2
+      dropout: 0.35
+
+
+train:
+  config:
+    random_state: 42
+    threads: 16
+    enable_cuda: true
+    epochs: 6
+    batch_size: 8
+    optimizer: "Adam"
+    learning_rate: 0.001
+    loss: "categorical_crossentropy"
+    metric: "categorical_accuracy"
+    validation_split: 0.15
+    logs:
+      file_path: ".logs/models/{DATE}_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  data_dir:
+    train: ".data/clean/tl_model/dataset/train/"
+    test: ".data/clean/tl_model/dataset/test/"
+
+  artefacts:
+    base_dir: "models/TLModel/artefacts/"
+    labels_name: "models/TLModel/artefacts/labels_name.json"
+    best_model: "models/TLModel/artefacts/best_model.keras"
+    fit_history: "models/TLModel/artefacts/fit_history.pkl"
+    callback_history: "models/TLModel/artefacts/callback_history.pkl"
+
+  metrics:
+    base_dir: "models/TLModel/metrics/"
+    test_confusion_matrix: "models/TLModel/metrics/test_confusion_matrix.jpg"
+    test_report: "models/TLModel/metrics/test_report.json"
+
+  plots:
+    base_dir: "models/TLModel/records/"
+    fit_plots: "models/TLModel/records/fit_plots.jpg"
+    class_validation_plots_dir: "models/TLModel/records/validation_class_metrics/"
+    macro_metrics_test: "models/TLModel/records/macro_metrics_test.jpg"
+
+
+predict:
+  model_path: "models/TLModel/artefacts/best_model.keras"
+  config:
+    threads: 16
+    enable_cuda: true
+    interpretability:
+      gradcam:
+        enable: false
+      layers:
+        enable: true
+        blocks: [1, 2, 4, 5]
+        n_filters: 8
+    logs:
+      file_path: ".logs/models/{DATE}_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+  input:
+    test_data_dir: ".data/clean/tl_model/image_test/"
+    new_data_dir: ".data/new/images/"
+  output:
+    results_dir: "predictions/results/TLModel/"
+    interpretability_dir: "predictions/interpretability/TLModel/"
