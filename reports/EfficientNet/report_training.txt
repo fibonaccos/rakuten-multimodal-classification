@@ -1,0 +1,39 @@
+
+Begin Training
+
+
+Batch size : 32
+Learning rate : 0.0001
+
+Époque 1/100, Perte: 2.1018, F1-score val: 0.3787
+Époque 1/100, Perte: 2.1018, F1-score train: 0.4070
+Époque 2/100, Perte: 1.7366, F1-score val: 0.4548
+Époque 2/100, Perte: 1.7366, F1-score train: 0.5146
+Époque 3/100, Perte: 1.9639, F1-score val: 0.4916
+Époque 3/100, Perte: 1.9639, F1-score train: 0.5881
+Époque 4/100, Perte: 2.0043, F1-score val: 0.5147
+Époque 4/100, Perte: 2.0043, F1-score train: 0.6452
+Époque 5/100, Perte: 2.1825, F1-score val: 0.5266
+Époque 5/100, Perte: 2.1825, F1-score train: 0.6974
+Époque 6/100, Perte: 1.7696, F1-score val: 0.5495
+Époque 6/100, Perte: 1.7696, F1-score train: 0.7445
+Époque 7/100, Perte: 1.5396, F1-score val: 0.5553
+Époque 7/100, Perte: 1.5396, F1-score train: 0.7915
+Époque 8/100, Perte: 1.4881, F1-score val: 0.5780
+Époque 8/100, Perte: 1.4881, F1-score train: 0.8195
+Époque 9/100, Perte: 0.9363, F1-score val: 0.5809
+Époque 9/100, Perte: 0.9363, F1-score train: 0.8482
+Époque 10/100, Perte: 0.6900, F1-score val: 0.5701
+Époque 10/100, Perte: 0.6900, F1-score train: 0.8766
+Époque 11/100, Perte: 0.9625, F1-score val: 0.5895
+Époque 11/100, Perte: 0.9625, F1-score train: 0.9012
+Époque 12/100, Perte: 1.1121, F1-score val: 0.5745
+Époque 12/100, Perte: 1.1121, F1-score train: 0.9210
+Époque 13/100, Perte: 0.6673, F1-score val: 0.5825
+Époque 13/100, Perte: 0.6673, F1-score train: 0.9369
+Époque 14/100, Perte: 0.6959, F1-score val: 0.5871
+Époque 14/100, Perte: 0.6959, F1-score train: 0.9503
+Époque 15/100, Perte: 0.9515, F1-score val: 0.5802
+Époque 15/100, Perte: 0.9515, F1-score train: 0.9581
+Époque 16/100, Perte: 0.7188, F1-score val: 0.5869
+Époque 16/100, Perte: 0.7188, F1-score train: 0.9668
