@@ -1,0 +1,12 @@
+colorlog==6.10.1
+kornia==0.8.1
+matplotlib==3.10.8
+numpy>=2.0.0,<2.3.0
+opencv-python==4.12.0.88
+pandas>=2.0.3
+pyyaml==6.0.3
+rich==14.1.0
+seaborn==0.13.2
+scikit-learn<1.7
+torch==2.8.0
+tensorflow==2.20.0

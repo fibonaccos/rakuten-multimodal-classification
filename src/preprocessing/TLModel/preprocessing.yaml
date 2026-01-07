@@ -1,0 +1,103 @@
+metadata:
+  name: "tl_model_preprocessing"
+  description: "Preprocessing pipeline of transfer learning model on ResNet."
+
+
+preprocessing:
+  config:
+    n_images: 3000
+    image_shape: [500, 500, 3]
+    enable_cuda: true
+    threads: 16
+    train_size: 0.8
+    random_state: 42
+    logs:
+      file_path: ".logs/preprocessing/{DATE}_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  input:
+    text_path: ".data/raw/X_raw.csv"
+    image_dir: ".data/raw/images/"
+    image_labels: ".data/raw/Y_raw.csv"
+
+  output:
+    output_dir: ".data/clean/tl_model/"
+    train:
+      image_dir: ".data/clean/tl_model/image_train/"
+      image_labels: ".data/clean/tl_model/labels_train.csv"
+    test:
+      image_dir: ".data/clean/tl_model/image_test/"
+      image_labels: ".data/clean/tl_model/labels_test.csv"
+    dataset:
+      dataset_dir: ".data/clean/tl_model/dataset/"
+      train_set: ".data/clean/tl_model/dataset/train/"
+      test_set: ".data/clean/tl_model/dataset/test/"
+
+  steps:
+    rotation:
+      enable: true
+      transformer: RandomImageRotation
+      params:
+        degree: 180
+        p: 0.75
+    horizontal_flip:
+      enable: true
+      transformer: RandomImageHFlip
+      params:
+        p: 0.75
+    vertical_flip:
+      enable: true
+      transformer: RandomImageVFlip
+      params:
+        p: 0.75
+    crop:
+      enable: true
+      transformer: RandomImageCrop
+      params:
+        min_scale: 0.6
+        p: 0.3
+    zoom:
+      enable: true
+      transformer: RandomImageZoom
+      params:
+        min_scale: 0.8
+        max_scale: 1.2
+        p: 0.5
+    blur:
+      enable: true
+      transformer: RandomImageBlur
+      params:
+        max_kernel: 7
+        p: 0.75
+    noise:
+      enable: true
+      transformer: RandomImageNoise
+      params:
+        max_std: 0.1
+        p: 0.75
+    contrast:
+      enable: true
+      transformer: RandomImageContrast
+      params:
+        min_factor: 0.6
+        max_factor: 1.4
+        p: 0.75
+    coloration:
+      enable: true
+      transformer: RandomImageColoration
+      params:
+        p: 0.3
+    area_dropout:
+      enable: false
+      transformer: RandomImageDropout
+      params:
+        min_area: 0.02
+        max_area: 0.05
+        p: 0
+    pixel_dropout:
+      enable: true
+      transformer: RandomImagePixelDropout
+      params:
+        max_rate: 0.1
+        p: 0.5
