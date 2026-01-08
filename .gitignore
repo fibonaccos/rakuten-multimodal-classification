@@ -1,16 +1,30 @@
-# Ignorer l'environnement virtuel (peu importe son nom courant)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 venv/
 env/
 .env/
 .venv/
 
-# Ignorer les données (lourdes ou confidentielles)
+
+Lib/
+Scripts/
+share/
+Include/
+bin/
+
 data/
+models/*
+!models/SVM/
+!models/SVM/.gitkeep
+models/*.joblib
+models/*.pkl
 
-# Ignorer les fichiers compilés par Python (inutiles)
-__pycache__/
-*.pyc
 
-# Ignorer les fichiers système (Mac/Windows)
+
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db
