@@ -27,7 +27,8 @@ reports/*
 
 data/*
 
-
+.logs/
+.data/
 .idea/
 .vscode/
 .DS_Store
