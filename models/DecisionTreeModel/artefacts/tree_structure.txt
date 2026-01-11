@@ -1,0 +1,61 @@
+|--- description_3407 <= 0.01
+|   |--- designation_2196 <= 0.05
+|   |   |--- description_3171 <= 0.05
+|   |   |   |--- description_3239 <= 0.11
+|   |   |   |   |--- description_177 <= 0.01
+|   |   |   |   |   |--- designation_2936 <= 0.08
+|   |   |   |   |   |   |--- designation_852 <= 0.19
+|   |   |   |   |   |   |   |--- description_3761 <= 0.02
+|   |   |   |   |   |   |   |   |--- designation_1 <= 0.08
+|   |   |   |   |   |   |   |   |   |--- designation_1828 <= 0.19
+|   |   |   |   |   |   |   |   |   |   |--- description_2102 <= 0.02
+|   |   |   |   |   |   |   |   |   |   |   |--- truncated branch of depth 10
+|   |   |   |   |   |   |   |   |   |   |--- description_2102 >  0.02
+|   |   |   |   |   |   |   |   |   |   |   |--- class: 23
+|   |   |   |   |   |   |   |   |   |--- designation_1828 >  0.19
+|   |   |   |   |   |   |   |   |   |   |--- class: 4
+|   |   |   |   |   |   |   |   |--- designation_1 >  0.08
+|   |   |   |   |   |   |   |   |   |--- class: 18
+|   |   |   |   |   |   |   |--- description_3761 >  0.02
+|   |   |   |   |   |   |   |   |--- class: 25
+|   |   |   |   |   |   |--- designation_852 >  0.19
+|   |   |   |   |   |   |   |--- class: 5
+|   |   |   |   |   |--- designation_2936 >  0.08
+|   |   |   |   |   |   |--- designation_2953 <= 0.06
+|   |   |   |   |   |   |   |--- designation_2936 <= 0.16
+|   |   |   |   |   |   |   |   |--- class: 20
+|   |   |   |   |   |   |   |--- designation_2936 >  0.16
+|   |   |   |   |   |   |   |   |--- class: 19
+|   |   |   |   |   |   |--- designation_2953 >  0.06
+|   |   |   |   |   |   |   |--- class: 19
+|   |   |   |   |--- description_177 >  0.01
+|   |   |   |   |   |--- designation_2558 <= 0.11
+|   |   |   |   |   |   |--- description_1727 <= 0.04
+|   |   |   |   |   |   |   |--- designation_4545 <= 0.09
+|   |   |   |   |   |   |   |   |--- designation_4484 <= 0.09
+|   |   |   |   |   |   |   |   |   |--- description_452 <= 0.02
+|   |   |   |   |   |   |   |   |   |   |--- designation_549 <= 0.09
+|   |   |   |   |   |   |   |   |   |   |   |--- truncated branch of depth 10
+|   |   |   |   |   |   |   |   |   |   |--- designation_549 >  0.09
+|   |   |   |   |   |   |   |   |   |   |   |--- class: 10
+|   |   |   |   |   |   |   |   |   |--- description_452 >  0.02
+|   |   |   |   |   |   |   |   |   |   |--- class: 3
+|   |   |   |   |   |   |   |   |--- designation_4484 >  0.09
+|   |   |   |   |   |   |   |   |   |--- class: 23
+|   |   |   |   |   |   |   |--- designation_4545 >  0.09
+|   |   |   |   |   |   |   |   |--- class: 11
+|   |   |   |   |   |   |--- description_1727 >  0.04
+|   |   |   |   |   |   |   |--- class: 16
+|   |   |   |   |   |--- designation_2558 >  0.11
+|   |   |   |   |   |   |--- class: 26
+|   |   |   |--- description_3239 >  0.11
+|   |   |   |   |--- class: 21
+|   |   |--- description_3171 >  0.05
+|   |   |   |--- description_1445 <= 0.01
+|   |   |   |   |--- class: 14
+|   |   |   |--- description_1445 >  0.01
+|   |   |   |   |--- class: 14
+|   |--- designation_2196 >  0.05
+|   |   |--- class: 9
+|--- description_3407 >  0.01
+|   |--- class: 23

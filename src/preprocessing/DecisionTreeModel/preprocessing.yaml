@@ -1,0 +1,49 @@
+metadata:
+  name: "decision_tree_preprocessing"
+  description: "Preprocessing pipeline for DecisionTreeClassifier model."
+
+
+preprocessing:
+  config:
+    sample_size: 5000  # Test avec 5000 pour validation rapide
+    train_size: 0.8
+    random_state: 42
+    logs:
+      file_path: ".logs/preprocessing/{DATE}_decision_tree_"
+      base_format: "%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s"
+      date_format: "%Y-%m-%d %H:%M:%S"
+
+  input:
+    text_path: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/X_train_update.csv"
+    image_dir: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/images/images/"
+    labels_path: "C:/Users/HP/DataScientest/PROJET/deep_learning_rakuten/Y_train_CVw08PX.csv"
+
+  output:
+    output_dir: "data/clean/decision_tree_model/"
+    train_features: "data/clean/decision_tree_model/train_features.csv"
+    test_features: "data/clean/decision_tree_model/test_features.csv"
+    train_labels: "data/clean/decision_tree_model/train_labels.csv"
+    test_labels: "data/clean/decision_tree_model/test_labels.csv"
+    transformers: "data/clean/decision_tree_model/transformers.pkl"
+
+  steps:
+    # Text preprocessing steps
+    text_cleaning:
+      enable: true
+      lowercase: true
+      remove_punctuation: true
+      remove_stopwords: true
+      
+    tfidf_vectorization:
+      enable: true
+      max_features: 5000  # FIXED: Augmenté de 3000 à 5000
+      ngram_range: [1, 2]
+      min_df: 2  # FIXED: Réduit de 3 à 2 pour garder plus de features
+      max_df: 0.9
+      
+    # Image preprocessing steps  
+    image_features:
+      enable: true
+      extract_color_histograms: true
+      extract_hog_features: false
+      resize_shape: [128, 128]
