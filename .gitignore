@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 
 .github/
+*.idea/
+*.ai/
 
 # C extensions
 *.so
