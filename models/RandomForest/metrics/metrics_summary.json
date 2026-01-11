@@ -1,0 +1,10 @@
+{
+  "accuracy": 0.508,
+  "train_accuracy": 0.555,
+  "overfitting_gap": 0.04700000000000004,
+  "f1_weighted": 0.5197335299173395,
+  "precision_weighted": 0.6577883943122173,
+  "recall_weighted": 0.508,
+  "n_estimators": 50,
+  "max_depth": 20
+}
