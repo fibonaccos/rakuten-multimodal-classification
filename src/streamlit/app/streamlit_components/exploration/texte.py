@@ -4,13 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import sys
-import re
-from bs4 import BeautifulSoup
 
 # Ajouter la racine du projet au PYTHONPATH
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# Chemins
+ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 
 
 @st.cache_data
@@ -23,31 +24,6 @@ def load_data():
     except Exception:
         pass
     return None
-
-
-@st.cache_data
-def load_full_data():
-    """Charge X_train et Y_train pour générer les wordclouds"""
-    try:
-        # Chemins vers les données brutes
-        data_dir = Path(r"C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten")
-        x_path = data_dir / "X_train_update.csv"
-        y_path = data_dir / "Y_train_CVw08PX.csv"
-        
-        if x_path.exists() and y_path.exists():
-            df_x = pd.read_csv(x_path)
-            df_y = pd.read_csv(y_path)
-            df = df_x.copy()
-            df['prdtypecode'] = df_y['prdtypecode']
-            return df
-    except Exception as e:
-        st.error(f"Erreur chargement données: {e}")
-    return None
-
-
-@st.cache_resource
-def download_nltk_resources():
-    """Télécharge les ressources NLTK nécessaires"""
     try:
         import nltk
         try:
@@ -173,30 +149,17 @@ def generate_interactive_wordclouds():
                 if st.button(f"{cat_code}\n{cat_name}", key=f"wc_{cat_code}", use_container_width=True):
                     st.session_state.selected_wordcloud_class = cat_code
     
-    # Générer le wordcloud pour la catégorie sélectionnée
+    # Afficher le wordcloud pré-généré pour la catégorie sélectionnée
     selected_class = st.session_state.selected_wordcloud_class
     st.markdown(f"### Catégorie : **{selected_class}** - *{category_names.get(selected_class, 'N/A')}*")
     
-    text_content = text_by_class[selected_class]
+    # Charger l'image pré-générée
+    wordcloud_path = ASSETS_DIR / "wordclouds" / f"wordcloud_{selected_class}.png"
     
-    if text_content and len(text_content.strip()) > 0:
-        wc = WordCloud(
-            width=1000, 
-            height=500, 
-            background_color='white', 
-            colormap='viridis',
-            max_words=100
-        ).generate(text_content)
-        
-        fig_wc, ax = plt.subplots(figsize=(12, 6))
-        ax.imshow(wc, interpolation='bilinear')
-        ax.set_title(f'Nuage de mots - Classe {selected_class}', fontsize=16, fontweight='bold')
-        ax.axis('off')
-        
-        st.pyplot(fig_wc)
-        plt.close(fig_wc)
+    if wordcloud_path.exists():
+        st.image(str(wordcloud_path), use_container_width=True)
     else:
-        st.warning(f"Pas assez de mots pour la classe {selected_class}")
+        st.warning(f"Nuage de mots non disponible pour la catégorie {selected_class}")
 
 
 def render():
