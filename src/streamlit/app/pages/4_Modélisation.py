@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
+from PIL import Image
 
 # Pour encapsuler le contenu dans des fonctions et des fichiers séparés,
 # isolation des variables, etc si besoin
 #from streamlit_components import modelisation
 
+# Fonction pour mise en cache
+@st.cache_data
+def load_image(image_path):
+    return Image.open(image_path)
 
 st.set_page_config(
     page_title="Modélisation",
@@ -112,7 +117,9 @@ with efficientnet_tab:
 
             with tab521:
                 st.markdown("### Impact du rééchantillonnage")
-                st.image("./reports/EfficientNet/figures/crossval_report.png", caption="Comparaison des expériences")
+                image_path = "./reports/EfficientNet/figures/crossval_report.png"
+                image = load_image(image_path)
+                st.image(image, caption="Comparaison des expériences")
 
                 st.write("""**5 expériences** """)
 
@@ -126,7 +133,9 @@ with efficientnet_tab:
 
             with tab522:
                 st.markdown("### Sur-apprentissage")
-                st.image("./reports/EfficientNet/figures/learning_curve.png", caption="Courbe de sur-apprentissage")
+                image_path = "./reports/EfficientNet/figures/learning_curve.png"
+                image = load_image(image_path)
+                st.image(image, caption="Courbe de sur-apprentissage")
 
                 st.write("""**Analyses** :""")
                 st.write("""- Fort sur-apprentissage : attendu au vu des déséquillibres des classes.
@@ -144,7 +153,9 @@ with efficientnet_tab:
                 st.write("Accuracy : 0,569")
 
             with tab524:
-                st.image("./reports/EfficientNet/figures/confusion_matrix.png", caption="Matrice de confusion")
+                image_path = "./reports/EfficientNet/figures/confusion_matrix.png"
+                image = load_image(image_path)
+                st.image(image, caption="Matrice de confusion")
 
                 st.write("""Analyse :""")
                 st.write("""- Certaines classes (2705, 2905, et en particulier 1160) sont très bien prédites par le modèle, avec un pourcentage de bonnes prédictions supérieur à **85%**.""")
