@@ -124,11 +124,14 @@ def write_modelisation_training() -> None:
             ]
         })
         st.dataframe(hp_df, hide_index=True)
-    st.markdown("### Quelques résultats issus de l'entraînement et des tests")
+    st.markdown("### Courbe d'apprentissage sur le jeu d'entraînement et de validation")
     col1, col2 = st.columns(2)
     with col1:
         st.image("src/streamlit/app/streamlit_components/modelisation/exemples/fit_plots.jpg")
     with col2:
         st.image("src/streamlit/app/streamlit_components/modelisation/exemples/macro_metrics_test.jpg")
-    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/test_confusion_matrix.jpg")
+    return None
+
+
+def write_modelisation_results() -> None:
     return None

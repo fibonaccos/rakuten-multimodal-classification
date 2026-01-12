@@ -55,4 +55,4 @@ with resnet_tab:
         tlmodel.write_modelisation_training()
 
     with results:
-        pass
+        tlmodel.write_modelisation_results()
