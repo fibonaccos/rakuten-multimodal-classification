@@ -25,7 +25,15 @@ reports/*
 
 !requirements/.gitkeep
 
-data/*
+# Exclure les données brutes (trop volumineuses)
+data/*.csv
+data/images/
+data/X_train.csv
+data/Y_train.csv
+
+# MAIS inclure les fichiers nécessaires au Streamlit
+!src/streamlit/app/data/
+!src/streamlit/app/data/**
 
 .logs/
 .data/
