@@ -14,5 +14,5 @@ st.set_page_config(
 
 st.title("Introduction")
 
-
-# TODO: COMPLETER ICI STEVE
+# Afficher le contenu de l'introduction
+introduction.content.render()

@@ -24,10 +24,17 @@ donnees_textuelles_tab, donnees_images_tab = st.tabs([
 with donnees_textuelles_tab:
     st.header("Données textuelles")
 
-    # TODO: COMPLETER ICI ROMAIN
+    pretraitement.texte.render()
 
 
 with donnees_images_tab:
     st.header("Données photographiques")
 
-    # TODO: COMPLETER ICI BRYAN
+    donnees_images_originales_tab, donnees_images_augmentees_tab = st.tabs(
+        ["Données originales",
+         "Données augmentées"]
+    )
+    with donnees_images_originales_tab:
+        pretraitement.images.write_donnees_originales()
+    with donnees_images_augmentees_tab:
+        pretraitement.images.write_donnees_augmentees()

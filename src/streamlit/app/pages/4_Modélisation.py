@@ -4,7 +4,7 @@ from PIL import Image
 
 # Pour encapsuler le contenu dans des fonctions et des fichiers séparés,
 # isolation des variables, etc si besoin
-#from streamlit_components import modelisation
+from streamlit_components.modelisation import tlmodel
 
 # Fonction pour mise en cache
 @st.cache_data
@@ -21,24 +21,29 @@ st.set_page_config(
 st.title("Modélisation")
 
 
-modele_steve_tab, svm_tab, efficientnet_tab, resnet_tab = st.tabs([
-    "<Modèle de Steve>",
+sgdc_tab, random_forest_tab, svm_tab, efficientnet_tab, resnet_tab = st.tabs([
+    "📈 SGDClassifier",
+    "🌲 Random Forest",
     "SVM",
     "EfficientNet",
     "ResNet"
 ])
 
 
-with modele_steve_tab:
-    st.header("<Modèle de Steve>")
+with sgdc_tab:
+    st.header("📈 SGDClassifier")
+    modelisation.sgdc.render()
 
-    # TODO: COMPLETER ICI STEVE
+
+with random_forest_tab:
+    st.header("🌲 Random Forest")
+    modelisation.random_forest.render()
 
 
 with svm_tab:
     st.header("SVM")
 
-    # TODO: COMPLETER ICI ROMAIN
+    modelisation.svm.render()
 
 
 with efficientnet_tab:
@@ -163,6 +168,17 @@ with efficientnet_tab:
                 st.write("""- Les autres classes affichent des taux variant entre **30%** et **76%**.""")
 
 with resnet_tab:
-    st.header("ResNet")
+    st.header("ResNet Transfer Learning")
+    architecture, training, interpretability = st.tabs(
+        ["Architecture",
+         "Entraînement",
+         "Interprétabilité"]
+    )
+    with architecture:
+        tlmodel.write_modelisation_architecture()
 
-    # TODO: COMPLETER ICI BRYAN
+    with training:
+        tlmodel.write_modelisation_training()
+
+    with interpretability:
+        tlmodel.write_modelisation_interpretability()

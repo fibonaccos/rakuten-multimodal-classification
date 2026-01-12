@@ -11,9 +11,9 @@ def load_image(path: str) -> ImageFile:
 
 def write_donnees_originales() -> None:
     original_images = [
-        "app/streamlit_components/pretraitement/images/examples/image_227835630_product_4195271.jpg",
-        "app/streamlit_components/pretraitement/images/examples/image_588135830_product_54376338.jpg",
-        "app/streamlit_components/pretraitement/images/examples/image_922580767_product_171520128.jpg"
+        "src/streamlit/app/streamlit_components/pretraitement/exemples/image_227835630_product_4195271.jpg",
+        "src/streamlit/app/streamlit_components/pretraitement/exemples/image_588135830_product_54376338.jpg",
+        "src/streamlit/app/streamlit_components/pretraitement/exemples/image_922580767_product_171520128.jpg"
     ]
 
     images = [load_image(im_path) for im_path in original_images]
@@ -71,16 +71,16 @@ def write_donnees_augmentees() -> None:
     )
     augmented_images = [
         (
-            "app/streamlit_components/pretraitement/images/examples/image_234234_product_184251.jpg",
-            "app/streamlit_components/pretraitement/images/examples/image_234234_product_184251_aug.jpg"
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_234234_product_184251.jpg",
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_234234_product_184251_aug.jpg"
         ),
         (
-            "app/streamlit_components/pretraitement/images/examples/image_959219199_product_231450251.jpg",
-            "app/streamlit_components/pretraitement/images/examples/image_959219199_product_231450251_aug.jpg"
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_959219199_product_231450251.jpg",
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_959219199_product_231450251_aug.jpg"
         ),
         (
-            "app/streamlit_components/pretraitement/images/examples/image_977867804_product_278547973.jpg",
-            "app/streamlit_components/pretraitement/images/examples/image_977867804_product_278547973_aug.jpg"
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_977867804_product_278547973.jpg",
+            "src/streamlit/app/streamlit_components/pretraitement/exemples/image_977867804_product_278547973_aug.jpg"
         )
     ]
 
