@@ -25,6 +25,7 @@ with col1:
     st.write("##### Propres aux modèles :")
     st.write("- Random Forest : inadapté à la haute dimensionnalité textuelle")
     st.write("- SGDC : performance plafonnée (75% max) + ne capture pas les patterns non linéaires")
+    st.write("- SVM : grands et/ou complexes ensembles de données")
     st.write("- EfficientNet : ressources limitées + performances passables")
 
 with col2:
