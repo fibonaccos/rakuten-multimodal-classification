@@ -1,5 +1,7 @@
 import streamlit as st
 
+from streamlit_components import modelisation
+
 
 st.set_page_config(
     page_title="Accueil",

@@ -2,7 +2,7 @@ import streamlit as st
 
 # Pour encapsuler le contenu dans des fonctions et des fichiers séparés,
 # isolation des variables, etc si besoin
-from streamlit_components import modelisation
+from streamlit_components.modelisation import tlmodel
 
 
 st.set_page_config(
@@ -47,6 +47,17 @@ with efficientnet_tab:
 
 
 with resnet_tab:
-    st.header("ResNet")
+    st.header("ResNet Transfer Learning")
+    architecture, training, interpretability = st.tabs(
+        ["Architecture",
+         "Entraînement",
+         "Interprétabilité"]
+    )
+    with architecture:
+        tlmodel.write_modelisation_architecture()
 
-    # TODO: COMPLETER ICI BRYAN
+    with training:
+        tlmodel.write_modelisation_training()
+
+    with interpretability:
+        tlmodel.write_modelisation_interpretability()
