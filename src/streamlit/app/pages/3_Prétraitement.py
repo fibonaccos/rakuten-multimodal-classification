@@ -24,7 +24,7 @@ donnees_textuelles_tab, donnees_images_tab = st.tabs([
 with donnees_textuelles_tab:
     st.header("Données textuelles")
 
-    # TODO: COMPLETER ICI ROMAIN
+    pretraitement.texte.render()
 
 
 with donnees_images_tab:

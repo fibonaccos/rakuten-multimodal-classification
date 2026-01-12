@@ -1,6 +1,6 @@
-from . import images
+from . import images, texte
 
 
 __all__ = [
-    "images"
+    "images", "texte"
 ]
