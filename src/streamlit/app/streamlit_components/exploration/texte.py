@@ -115,7 +115,7 @@ def process_text_for_wordclouds(df):
 
 
 def generate_interactive_wordclouds():
-    """Affiche les nuages de mots pré-générés avec sélection interactive"""
+    """Affiche les nuages de mots pré-générés avec sélection interactive (limité à 3 catégories)"""
     
     # Chemin vers les images pré-générées
     wordclouds_dir = Path(__file__).parent.parent.parent / 'assets' / 'wordclouds'
@@ -124,37 +124,28 @@ def generate_interactive_wordclouds():
         st.info("📁 Images des nuages de mots non disponibles")
         return
     
-    # Mapping des catégories
+    # Mapping des catégories (LIMITÉ À 3 CATÉGORIES)
     category_names = {
-        10: "Livres", 40: "Jeux vidéo/consoles", 50: "Accessoires gaming",
-        60: "Consoles", 1140: "Figurines", 1160: "Cartes collection",
-        1180: "Modélisme", 1280: "Jeux enfants", 1281: "Jeux PC",
-        1300: "Accessoires bébé", 1301: "Puériculture", 1302: "Accessoires consoles",
-        1320: "Mobilier enfant", 1560: "Mobilier intérieur", 1920: "Linge maison",
-        1940: "Alimentation", 2060: "Décoration", 2220: "Animaux",
-        2280: "Magazines", 2403: "Livres format poche", 2462: "Jeux société",
-        2522: "Papeterie", 2582: "Mobilier extérieur", 2583: "Piscines",
-        2585: "Bricolage", 2705: "Livres anciens", 2905: "Jeux rétro"
+        2583: "Piscines",
+        10: "Livres",
+        1280: "Jeux enfants"
     }
     
     st.write("**Sélectionnez une catégorie pour visualiser son nuage de mots :**")
     
     # Session state pour stocker la sélection
     if 'selected_wordcloud_class' not in st.session_state:
-        st.session_state.selected_wordcloud_class = list(category_names.keys())[0]
+        st.session_state.selected_wordcloud_class = 2583
     
-    # Créer des colonnes pour les boutons (7 boutons par ligne)
-    cols_per_row = 7
-    categories = sorted(category_names.keys())
-    rows = [categories[i:i+cols_per_row] for i in range(0, len(categories), cols_per_row)]
+    # Créer 3 colonnes pour les 3 boutons
+    cols = st.columns(3)
+    categories = [2583, 10, 1280]
     
-    for row in rows:
-        cols = st.columns(cols_per_row)
-        for idx, cat_code in enumerate(row):
-            cat_name = category_names.get(cat_code, f"Cat {cat_code}")
-            with cols[idx]:
-                if st.button(f"{cat_code}\n{cat_name}", key=f"wc_{cat_code}", use_container_width=True):
-                    st.session_state.selected_wordcloud_class = cat_code
+    for idx, cat_code in enumerate(categories):
+        cat_name = category_names[cat_code]
+        with cols[idx]:
+            if st.button(f"**{cat_code}**\n{cat_name}", key=f"wc_{cat_code}", use_container_width=True):
+                st.session_state.selected_wordcloud_class = cat_code
     
     # Afficher le wordcloud sélectionné
     if hasattr(st.session_state, 'selected_wordcloud_class'):
