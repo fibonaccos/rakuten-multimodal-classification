@@ -15,18 +15,23 @@ st.set_page_config(
 st.title("Modélisation")
 
 
-modele_steve_tab, svm_tab, efficientnet_tab, resnet_tab = st.tabs([
-    "<Modèle de Steve>",
+sgdc_tab, random_forest_tab, svm_tab, efficientnet_tab, resnet_tab = st.tabs([
+    "📈 SGDClassifier",
+    "🌲 Random Forest",
     "SVM",
     "EfficientNet",
     "ResNet"
 ])
 
 
-with modele_steve_tab:
-    st.header("<Modèle de Steve>")
+with sgdc_tab:
+    st.header("📈 SGDClassifier")
+    modelisation.sgdc.render()
 
-    # TODO: COMPLETER ICI STEVE
+
+with random_forest_tab:
+    st.header("🌲 Random Forest")
+    modelisation.random_forest.render()
 
 
 with svm_tab:
