@@ -108,6 +108,145 @@ def render():
     identifier visuellement les similitudes et différences lexicales entre catégories.
     """)
     
+    # === VISUALISATIONS INTERACTIVES ===
+    with st.expander("📊 Voir les visualisations (Distribution + Nuages de mots + Langues)"):
+        try:
+            # Import des fonctions du collègue
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            from wordcloud import WordCloud
+            import re
+            from bs4 import BeautifulSoup
+            import nltk
+            from nltk.corpus import stopwords
+            
+            # Tentative de chargement des données
+            try:
+                # Chemins possibles
+                data_paths = [
+                    "C:/Users/Peeta/Desktop/Projet/rakuten-multimodal-classification/data/raw/X_train_update.csv",
+                    "data/raw/X_train_update.csv",
+                    "../../../../../data/raw/X_train_update.csv"
+                ]
+                
+                y_paths = [
+                    "C:/Users/Peeta/Desktop/Projet/rakuten-multimodal-classification/data/raw/Y_train_CVw08PX.csv",
+                    "data/raw/Y_train_CVw08PX.csv",
+                    "../../../../../data/raw/Y_train_CVw08PX.csv"
+                ]
+                
+                df_x = None
+                df_y = None
+                
+                for x_path, y_path in zip(data_paths, y_paths):
+                    try:
+                        df_x = pd.read_csv(x_path)
+                        df_y = pd.read_csv(y_path)
+                        break
+                    except:
+                        continue
+                
+                if df_x is None:
+                    st.warning("⚠️ Données brutes non disponibles. Visualisations désactivées.")
+                else:
+                    df = df_x.copy()
+                    df['prdtypecode'] = df_y['prdtypecode']
+                    
+                    # 1. Distribution des classes
+                    st.markdown("##### 📊 Distribution des Catégories")
+                    
+                    type_counts = df['prdtypecode'].value_counts()
+                    fig1, ax1 = plt.subplots(figsize=(12, 6))
+                    type_counts.plot(kind='bar', color=sns.color_palette("viridis", len(type_counts)), ax=ax1)
+                    ax1.set_title('Distribution des Types de Produits', fontsize=16, fontweight='bold')
+                    ax1.set_xlabel('Type de Produit', fontsize=14)
+                    ax1.set_ylabel('Nombre d\'Occurrences', fontsize=14)
+                    plt.xticks(rotation=45, fontsize=12)
+                    
+                    for index, value in enumerate(type_counts):
+                        ax1.text(index, value, str(value), ha='center', va='bottom', fontsize=9)
+                    
+                    plt.tight_layout()
+                    st.pyplot(fig1)
+                    plt.close()
+                    
+                    # 2. Nuages de mots
+                    st.markdown("##### ☁️ Nuages de Mots par Catégorie")
+                    
+                    # Fonction de nettoyage
+                    def get_stopwords():
+                        try:
+                            return set(stopwords.words('french'))
+                        except:
+                            return set()
+                    
+                    FINAL_STOPWORDS = get_stopwords()
+                    
+                    def throw_html_elem(text):
+                        if not isinstance(text, str): return ""
+                        try:
+                            return BeautifulSoup(text, "html.parser").get_text(separator=" ")
+                        except:
+                            return text
+                    
+                    def basic_clean(text):
+                        if not isinstance(text, str): return ""
+                        text = text.lower()
+                        text = re.sub(r"[^a-zàâçéèêëîïôûùüÿñæœ\s]", " ", text)
+                        text = re.sub(r"\s+", " ", text)
+                        words = text.split()
+                        words = [w for w in words if w not in FINAL_STOPWORDS and len(w) > 2]
+                        return " ".join(words)
+                    
+                    # Préparer les données
+                    df['lexical_field'] = df['designation'].fillna('') + ' ' + df['description'].fillna('')
+                    df['lexical_field'] = df['lexical_field'].apply(lambda s: basic_clean(throw_html_elem(s)))
+                    text_by_class = df.groupby('prdtypecode')['lexical_field'].apply(lambda s: ' '.join(s))
+                    
+                    available_classes = sorted(text_by_class.index.unique())
+                    selected_class = st.selectbox("Choisir une classe :", available_classes, index=0)
+                    
+                    if selected_class:
+                        text_content = text_by_class[selected_class]
+                        
+                        if text_content and len(text_content.strip()) > 0:
+                            wc = WordCloud(width=800, height=400, background_color='white', colormap='cividis').generate(text_content)
+                            
+                            fig_wc, ax_wc = plt.subplots(figsize=(10, 6))
+                            ax_wc.imshow(wc, interpolation='bilinear')
+                            ax_wc.set_title(f'Nuage de mots - Classe : {selected_class}', fontsize=16)
+                            ax_wc.axis('off')
+                            
+                            st.pyplot(fig_wc)
+                            plt.close()
+                        else:
+                            st.warning(f"Pas assez de mots clés pour la classe {selected_class}")
+                    
+                    # 3. Distribution des langues
+                    st.markdown("##### 🌍 Distribution des Langues")
+                    
+                    donnees_langues = {
+                        "Français": 27000,
+                        "Anglais": 7600,
+                        "Italien": 5000,
+                        "Unknown": 3000,
+                        "Roumain": 2500,
+                        "Espagnol": 1200
+                    }
+                    
+                    st.bar_chart(donnees_langues)
+                    
+                    st.caption("""
+                    📌 **Note** : Distribution approximative basée sur détection automatique avec `langdetect`.
+                    Le français domine (~70%), mais présence significative de langues étrangères (~15-20%).
+                    """)
+                    
+            except Exception as e:
+                st.error(f"Erreur lors du chargement des visualisations : {e}")
+                
+        except ImportError as e:
+            st.warning(f"⚠️ Bibliothèques manquantes pour les visualisations : {e}")
+    
     st.markdown("---")
     
     # Données textuelles

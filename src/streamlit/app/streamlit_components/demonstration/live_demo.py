@@ -66,6 +66,13 @@ def load_model_artifacts(model_name):
             model_file = model_path / "rf_model.pkl"
         elif model_name == "SGDCModel":
             model_file = model_path / "sgdc_model.pkl"
+        elif model_name == "SVMModel":
+            # SVM utilise un pipeline complet
+            model_file = PROJECT_ROOT / "svm_pipeline.pkl"
+            if model_file.exists():
+                pipeline = joblib.load(model_file)
+                return pipeline, None  # Pas de label_encoder séparé pour SVM
+            return None, None
         else:
             return None, None
         
@@ -136,6 +143,11 @@ def preprocess_text(user_input, transformers):
 def predict_with_model(model, label_encoder, text_features, model_name):
     """Fait une prédiction avec un modèle"""
     try:
+        # Cas spécial SVM : pipeline complet
+        if model_name == "SVMModel":
+            # Le modèle SVM attend du texte brut (nettoyé en interne)
+            return None, None, None  # Géré séparément
+        
         # Ajouter features images nulles (192 dimensions)
         import scipy.sparse as sp
         
@@ -167,6 +179,46 @@ def predict_with_model(model, label_encoder, text_features, model_name):
         return None, None, None
 
 
+def predict_with_svm(pipeline, user_input):
+    """Fait une prédiction avec le modèle SVM"""
+    try:
+        import re
+        import unicodedata
+        
+        # Nettoyage comme dans predict.py
+        def clean_text(text):
+            if not isinstance(text, str): return ""
+            text = text.lower()
+            text = ''.join(c for c in unicodedata.normalize('NFKD', text) if not unicodedata.combining(c))
+            text = re.sub(r'<[^>]+>', ' ', text)
+            text = re.sub(r'[^a-z\s]', ' ', text)
+            text = re.sub(r'\s+', ' ', text).strip()
+            return text
+        
+        cleaned_text = clean_text(user_input)
+        
+        # Prédiction directe avec le pipeline
+        prediction = pipeline.predict([cleaned_text])[0]
+        
+        # Essayer d'obtenir les probabilités si disponible
+        try:
+            prediction_proba = pipeline.predict_proba([cleaned_text])
+            return prediction, prediction_proba, None
+        except:
+            # SVM linéaire n'a pas predict_proba, utiliser decision_function
+            try:
+                decision_scores = pipeline.decision_function([cleaned_text])
+                # Convertir en pseudo-probabilités
+                from scipy.special import softmax
+                prediction_proba = softmax(decision_scores, axis=1)
+                return prediction, prediction_proba, None
+            except:
+                return prediction, None, None
+    except Exception as e:
+        st.error(f"Erreur prédiction SVM: {e}")
+        return None, None, None
+
+
 def render():
     """Affiche la page de démonstration live"""
     
@@ -181,16 +233,18 @@ def render():
     with st.spinner("🔄 Chargement des modèles..."):
         sgdc_model, sgdc_label_encoder = load_model_artifacts("SGDCModel")
         rf_model, rf_label_encoder = load_model_artifacts("RandomForest")
+        svm_pipeline, _ = load_model_artifacts("SVMModel")
     
     # Vérifier si au moins un modèle est chargé
     models_loaded = []
     if sgdc_model is not None:
         models_loaded.append("SGDC")
-        st.success("✅ Modèle SGDC chargé (75.4% accuracy)")
     
     if rf_model is not None:
         models_loaded.append("Random Forest")
-        st.success("✅ Modèle Random Forest chargé (50.8% accuracy)")
+    
+    if svm_pipeline is not None:
+        models_loaded.append("SVM")
     
     if len(models_loaded) == 0:
         st.warning("""
@@ -243,11 +297,13 @@ def render():
     # Sélection des modèles à utiliser
     st.markdown("### 🤖 Sélection des Modèles")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         use_sgdc = st.checkbox("Utiliser SGDC", value=True, disabled=sgdc_model is None)
     with col2:
         use_rf = st.checkbox("Utiliser Random Forest", value=True, disabled=rf_model is None)
+    with col3:
+        use_svm = st.checkbox("Utiliser SVM", value=True, disabled=svm_pipeline is None)
     
     # Bouton de prédiction
     col1, col2 = st.columns([1, 4])
@@ -285,6 +341,13 @@ def render():
                 if pred is not None:
                     results.append(("Random Forest", pred, proba, pred_encoded, rf_label_encoder))
             
+            # Prédiction SVM
+            if use_svm and svm_pipeline is not None:
+                pred, proba, _ = predict_with_svm(svm_pipeline, user_input)
+                if pred is not None:
+                    # Pour SVM, pas de label_encoder séparé, les classes sont directement les codes
+                    results.append(("SVM", pred, proba, pred, None))
+            
             # Afficher les résultats
             if len(results) == 0:
                 st.error("❌ Aucune prédiction disponible")
@@ -319,55 +382,69 @@ def render():
                             st.info(f"{cls} - {label} : {prob*100:.2f}%")
             
             else:
-                # Comparaison des deux modèles
+                # Comparaison des modèles (2 ou plus)
                 st.markdown("### 🔀 Comparaison des Prédictions")
                 
-                col1, col2 = st.columns(2)
+                # Affichage en colonnes
+                cols = st.columns(min(len(results), 3))
                 
                 for idx, (model_name, pred, proba, pred_encoded, label_enc) in enumerate(results):
-                    with [col1, col2][idx]:
+                    with cols[idx % 3]:
                         st.markdown(f"#### 🤖 {model_name}")
                         
                         st.markdown(f"<div style='font-size:2rem;text-align:center;color:#FF6B6B;font-weight:bold;'>{pred}</div>", unsafe_allow_html=True)
                         st.markdown(f"<div style='font-size:1rem;text-align:center;color:#666;'>{get_category_label(pred)}</div>", unsafe_allow_html=True)
                         
-                        max_proba = proba[0][pred_encoded]
-                        st.metric("Confiance", f"{max_proba*100:.1f}%")
-                        
-                        st.markdown("**Top 3 Classes**")
-                        top_3_idx = np.argsort(proba[0])[-3:][::-1]
-                        top_3_classes = label_enc.inverse_transform(top_3_idx)
-                        top_3_proba = proba[0][top_3_idx]
-                        
-                        for i, (cls, prob) in enumerate(zip(top_3_classes, top_3_proba)):
-                            label = get_category_label(cls)
-                            if i == 0:
-                                st.success(f"**{cls}** - {label} : {prob*100:.1f}%")
+                        # Confiance
+                        if proba is not None:
+                            if label_enc is not None:
+                                # SGDC et RF : avec label_encoder
+                                max_proba = proba[0][pred_encoded]
                             else:
-                                st.info(f"{cls} - {label} : {prob*100:.1f}%")
+                                # SVM : pred_encoded est déjà la classe, trouver l'index
+                                try:
+                                    pred_idx = list(proba[0]).index(max(proba[0]))
+                                    max_proba = proba[0][pred_idx]
+                                except:
+                                    max_proba = max(proba[0])
+                            
+                            st.metric("Confiance", f"{max_proba*100:.1f}%")
+                            
+                            # Top 3
+                            st.markdown("**Top 3 Classes**")
+                            top_3_idx = np.argsort(proba[0])[-3:][::-1]
+                            
+                            if label_enc is not None:
+                                top_3_classes = label_enc.inverse_transform(top_3_idx)
+                            else:
+                                # Pour SVM, on doit récupérer les classes depuis le pipeline
+                                try:
+                                    top_3_classes = [str(int(x)) for x in top_3_idx]  # Classes SVM
+                                except:
+                                    top_3_classes = top_3_idx
+                            
+                            top_3_proba = proba[0][top_3_idx]
+                            
+                            for i, (cls, prob) in enumerate(zip(top_3_classes, top_3_proba)):
+                                label = get_category_label(cls)
+                                if i == 0:
+                                    st.success(f"**{cls}** - {label} : {prob*100:.1f}%")
+                                else:
+                                    st.info(f"{cls} - {label} : {prob*100:.1f}%")
+                        else:
+                            st.warning("Probabilités non disponibles")
                 
-                # Analyse comparative
-                st.markdown("---")
-                st.markdown("### 📊 Analyse Comparative")
-                
-                sgdc_pred = results[0][1] if results[0][0] == "SGDC" else results[1][1]
-                rf_pred = results[1][1] if results[1][0] == "Random Forest" else results[0][1]
-                
-                if sgdc_pred == rf_pred:
-                    st.success(f"""
-                    ✅ **Accord parfait !** Les deux modèles prédisent la même catégorie : **{sgdc_pred}**
+                # Analyse comparative (si 2 modèles ou plus)
+                if len(results) >= 2:
+                    st.markdown("---")
+                    st.markdown("### 📊 Analyse Comparative")
                     
-                    Cela indique une forte confiance dans la prédiction.
-                    """)
-                else:
-                    st.warning(f"""
-                    ⚠️ **Désaccord entre les modèles**
-                    
-                    - SGDC prédit : **{sgdc_pred}**
-                    - Random Forest prédit : **{rf_pred}**
-                    
-                    SGDC étant plus performant (75.4% vs 50.8%), sa prédiction est probablement plus fiable.
-                    """)
+                    # Vérifier convergence
+                    predictions = [r[1] for r in results]
+                    if len(set(predictions)) == 1:
+                        st.success(f"✅ **Tous les modèles convergent** vers la catégorie **{predictions[0]}** ({get_category_label(predictions[0])})")
+                    else:
+                        st.warning(f"⚠️ **Divergence des prédictions** : {', '.join([f'{r[0]}: {r[1]}' for r in results])}")
     
     elif predict_button:
         st.warning("⚠️ Veuillez entrer une description de produit")
