@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 import sys
+import re
+from bs4 import BeautifulSoup
 
 # Ajouter la racine du projet au PYTHONPATH
 PROJECT_ROOT = Path(__file__).resolve().parents[5]
@@ -21,6 +23,180 @@ def load_data():
     except Exception:
         pass
     return None
+
+
+@st.cache_data
+def load_full_data():
+    """Charge X_train et Y_train pour générer les wordclouds"""
+    try:
+        # Chemins vers les données brutes
+        data_dir = Path(r"C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten")
+        x_path = data_dir / "X_train_update.csv"
+        y_path = data_dir / "Y_train_CVw08PX.csv"
+        
+        if x_path.exists() and y_path.exists():
+            df_x = pd.read_csv(x_path)
+            df_y = pd.read_csv(y_path)
+            df = df_x.copy()
+            df['prdtypecode'] = df_y['prdtypecode']
+            return df
+    except Exception as e:
+        st.error(f"Erreur chargement données: {e}")
+    return None
+
+
+@st.cache_resource
+def download_nltk_resources():
+    """Télécharge les ressources NLTK nécessaires"""
+    try:
+        import nltk
+        try:
+            nltk.data.find('corpora/stopwords')
+        except LookupError:
+            nltk.download('stopwords', quiet=True)
+    except ImportError:
+        pass
+
+
+def get_all_stopwords():
+    """Récupère tous les stopwords français étendus"""
+    try:
+        from nltk.corpus import stopwords
+        stopwds = set(stopwords.words('french'))
+    except:
+        stopwds = set()
+    
+    added_stopwds = {
+        'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'me', 'te', 'se', 'moi', 'toi', 'soi', 'leur', 'lui',
+        'en', 'y', 'ce', 'cela', 'ça', 'ceci', 'celui', 'celle', 'ceux', 'celles','mon', 'ton', 'son', 'notre', 'votre',
+        'leur', 'mes', 'tes', 'ses', 'nos', 'vos', 'leurs', 'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'au', 'aux',
+        'ce', 'ces', 'cet', 'cette', 'être', 'avoir', 'faire', 'aller', 'venir', 'pouvoir', 'devoir', 'savoir', 'dire',
+        'voir', 'mettre', 'prendre', 'donner', 'vouloir', 'falloir', 'et', 'ou', 'mais', 'donc', 'or', 'ni', 'car', 'par',
+        'pour', 'dans', 'sur', 'sous', 'avec', 'sans', 'entre', 'chez', 'vers', 'selon', 'depuis', 'pendant', 'autour',
+        'après', 'avant', 'si', 'quand', 'comme', 'bien', 'très', 'trop', 'peu', 'aussi', 'encore', 'déjà', 'toujours',
+        'jamais', 'parfois', 'souvent', 'moins', 'plus', 'autant', 'alors', 'ensuite', 'également', 'tout', 'tous',
+        'toutes', 'chaque', 'aucun', 'certaines', 'certains', 'plusieurs', 'autre', 'autres', 'même', 'tel', 'tels',
+        'tellement', 'chose', 'truc', 'cas', 'façon', 'manière', 'genre', 'type'
+    }
+    stopwds.update(added_stopwds)
+    return stopwds
+
+
+def throw_html_elem(text: str) -> str:
+    """Supprime les éléments HTML"""
+    if not isinstance(text, str): 
+        return ""
+    try:
+        return BeautifulSoup(text, "html.parser").get_text(separator=" ")
+    except:
+        return text
+
+
+def basic_clean(text: str, stopwords_set) -> str:
+    """Nettoie le texte pour wordcloud"""
+    if not isinstance(text, str): 
+        return ""
+    text = text.lower()
+    text = re.sub(r"[^a-zàâçéèêëîïôûùüÿñæœ\s]", " ", text) 
+    text = re.sub(r"\s+", " ", text)  
+    words = text.split()
+    words = [w for w in words if w not in stopwords_set and len(w) > 2]
+    return " ".join(words)
+
+
+@st.cache_data
+def process_text_for_wordclouds(df):
+    """Prépare les textes par catégorie pour wordclouds"""
+    stopwords_set = get_all_stopwords()
+    data = df.copy()
+    
+    data['lexical_field'] = data['designation'].fillna('') + ' ' + data['description'].fillna('')
+    data['lexical_field'] = data['lexical_field'].apply(lambda s: basic_clean(throw_html_elem(s), stopwords_set))
+    
+    grouped_text = data.groupby('prdtypecode')['lexical_field'].apply(lambda s: ' '.join(s))
+    
+    return grouped_text
+
+
+def generate_interactive_wordclouds():
+    """Génère les nuages de mots interactifs avec boutons"""
+    try:
+        from wordcloud import WordCloud
+    except ImportError:
+        st.warning("⚠️ Module wordcloud non disponible")
+        return
+    
+    download_nltk_resources()
+    
+    # Charger les données
+    df = load_full_data()
+    
+    if df is None:
+        st.info("📁 Données brutes non disponibles localement - nuages de mots désactivés")
+        return
+    
+    # Préparer les textes
+    with st.spinner("Traitement des textes..."):
+        text_by_class = process_text_for_wordclouds(df)
+    
+    available_classes = sorted(text_by_class.index.unique())
+    
+    # Mapping des catégories
+    category_names = {
+        10: "Livres/Médias", 40: "Jeux vidéo/Consoles", 50: "Accessoires gaming",
+        60: "Consoles", 1140: "Figurines", 1160: "Cartes collectibles",
+        1180: "Figurines", 1280: "Jeux (général)", 1281: "Jeux PC",
+        1300: "Déco intérieure", 1301: "Déco extérieure", 1302: "Accessoires consoles",
+        1320: "Mobilier intérieur", 1560: "Mobilier extérieur", 1920: "Linge de maison",
+        1940: "Literie/Ameublement", 2060: "Déco murale", 2220: "Équipement animaux",
+        2280: "Magazines", 2403: "Livres (autre type)", 2462: "Jeux/Consoles retro",
+        2522: "Papeterie", 2582: "Mobilier extérieur", 2583: "Piscines",
+        2585: "Bricolage", 2705: "Livres", 2905: "Jeux de société"
+    }
+    
+    st.write("**Sélectionnez une catégorie pour visualiser son nuage de mots :**")
+    
+    # Créer des colonnes pour les boutons (5 boutons par ligne)
+    cols_per_row = 5
+    rows = [available_classes[i:i+cols_per_row] for i in range(0, len(available_classes), cols_per_row)]
+    
+    # Session state pour stocker la sélection
+    if 'selected_wordcloud_class' not in st.session_state:
+        st.session_state.selected_wordcloud_class = available_classes[0]
+    
+    # Afficher les boutons
+    for row in rows:
+        cols = st.columns(cols_per_row)
+        for idx, cat_code in enumerate(row):
+            cat_name = category_names.get(cat_code, f"Cat {cat_code}")
+            with cols[idx]:
+                if st.button(f"{cat_code}\n{cat_name}", key=f"wc_{cat_code}", use_container_width=True):
+                    st.session_state.selected_wordcloud_class = cat_code
+    
+    # Générer le wordcloud pour la catégorie sélectionnée
+    selected_class = st.session_state.selected_wordcloud_class
+    st.markdown(f"### Catégorie : **{selected_class}** - *{category_names.get(selected_class, 'N/A')}*")
+    
+    text_content = text_by_class[selected_class]
+    
+    if text_content and len(text_content.strip()) > 0:
+        wc = WordCloud(
+            width=1000, 
+            height=500, 
+            background_color='white', 
+            colormap='viridis',
+            max_words=100
+        ).generate(text_content)
+        
+        fig_wc, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(wc, interpolation='bilinear')
+        ax.set_title(f'Nuage de mots - Classe {selected_class}', fontsize=16, fontweight='bold')
+        ax.axis('off')
+        
+        st.pyplot(fig_wc)
+        plt.close(fig_wc)
+    else:
+        st.warning(f"Pas assez de mots pour la classe {selected_class}")
 
 
 def render():
@@ -131,8 +307,8 @@ def render():
     identifier visuellement les similitudes et différences lexicales entre catégories.
     """)
     
-    # === VISUALISATIONS STATIQUES ===
-    with st.expander("📊 Voir les visualisations (Distribution + Nuages de mots + Langues)"):
+    # === VISUALISATIONS ===
+    with st.expander("📊 Voir les visualisations (Distribution + Nuages de mots)"):
         try:
             # Chemins vers les images statiques
             assets_path = Path(__file__).parent.parent.parent / "assets"
@@ -147,23 +323,9 @@ def render():
             
             st.markdown("---")
             
-            # 2. Nuages de mots
-            st.markdown("##### ☁️ Nuages de Mots pour Quelques Catégories")
-            wordcloud_path = assets_path / "wordclouds.png"
-            if wordcloud_path.exists():
-                st.image(str(wordcloud_path), use_container_width=True)
-            else:
-                st.info("Nuages de mots non disponibles")
-            
-            st.markdown("---")
-            
-            # 3. Distribution des langues
-            st.markdown("##### 🌍 Distribution des Langues")
-            lang_dist_path = assets_path / "language_distribution.png"
-            if lang_dist_path.exists():
-                st.image(str(lang_dist_path), use_container_width=True)
-            else:
-                st.info("Graphique non disponible")
+            # 2. Nuages de mots INTERACTIFS
+            st.markdown("##### ☁️ Nuages de Mots par Catégorie (Interactif)")
+            generate_interactive_wordclouds()
                     
         except Exception as e:
             st.error(f"Erreur lors du chargement des visualisations : {e}")
@@ -256,6 +418,15 @@ def render():
         st.metric("Anglais", "~8%", delta="Produits internationaux")
     with col3:
         st.metric("Autres", "~7%", delta="Espagnol, Italien, etc.")
+    
+    # Graphique distribution des langues
+    try:
+        assets_path = Path(__file__).parent.parent.parent / "assets"
+        lang_dist_path = assets_path / "language_distribution.png"
+        if lang_dist_path.exists():
+            st.image(str(lang_dist_path), use_container_width=True)
+    except Exception:
+        pass
     
     # Distribution des longueurs
     st.markdown("#### 📏 Distribution des Longueurs de Texte")
