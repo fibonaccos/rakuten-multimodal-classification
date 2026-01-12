@@ -68,7 +68,7 @@ def load_model_artifacts(model_name):
             model_file = model_path / "sgdc_model.pkl"
         elif model_name == "SVMModel":
             # SVM utilise un pipeline complet
-            model_file = PROJECT_ROOT / "svm_pipeline.pkl"
+            model_file = MODELS_DIR / "SVM" / "svm_pipeline.pkl"
             if model_file.exists():
                 pipeline = joblib.load(model_file)
                 return pipeline, None  # Pas de label_encoder séparé pour SVM
