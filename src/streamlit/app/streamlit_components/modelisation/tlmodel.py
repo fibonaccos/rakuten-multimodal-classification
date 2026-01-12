@@ -133,5 +133,25 @@ def write_modelisation_training() -> None:
     return None
 
 
-def write_modelisation_results() -> None:
+def write_modelisation_interpretability() -> None:
+    st.markdown("### Interprétabilité")
+    st.markdown(
+        f"""
+        On trouvera ci-dessous quelques exemples illustrant le comportement du modèle \
+        sur différentes profondeurs de couches. On note les choses suivantes :
+        """
+    )
+    st.info(
+        """
+        - Les couches supérieures ont une bonne tendance à réaliser des extractions que l'on attend \
+        (contours, traites, formes, ...)
+        - Les couches profondes, comme c'est le cas dans nombre de modèles profonds, sont plus \
+        délicates à interpréter (caractéristiques des images abstraites)
+        """
+    )
+    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/carte1.jpg")
+    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/coussin.jpg")
+    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/piscine1.jpg")
+    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/piscine2.jpg")
+    st.image("src/streamlit/app/streamlit_components/modelisation/exemples/rideaux.jpg")
     return None

@@ -43,10 +43,10 @@ with efficientnet_tab:
 
 with resnet_tab:
     st.header("ResNet Transfer Learning")
-    architecture, training, results = st.tabs(
+    architecture, training, interpretability = st.tabs(
         ["Architecture",
          "Entraînement",
-         "Résultats"]
+         "Interprétabilité"]
     )
     with architecture:
         tlmodel.write_modelisation_architecture()
@@ -54,5 +54,5 @@ with resnet_tab:
     with training:
         tlmodel.write_modelisation_training()
 
-    with results:
-        tlmodel.write_modelisation_results()
+    with interpretability:
+        tlmodel.write_modelisation_interpretability()
