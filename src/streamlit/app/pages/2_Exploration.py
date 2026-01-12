@@ -14,5 +14,5 @@ st.set_page_config(
 
 st.title("Exploration des données")
 
-
-# TODO: COMPLETER ICI ROMAIN
+# Afficher l'exploration des données TEXTE
+exploration.texte.render()

@@ -1,6 +1,3 @@
 from . import texte
 
-
-__all__ = [
-    "texte"
-]
+__all__ = ["texte"]

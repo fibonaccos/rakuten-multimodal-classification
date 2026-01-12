@@ -12,15 +12,7 @@ st.set_page_config(
 )
 
 
-st.title("Démonstration")
+st.title("Démonstration Live")
 
-
-modele_steve_tab, svm_tab, efficientnet_tab, resnet_tab = st.tabs([
-    "<Modèle de Steve>",
-    "SVM",
-    "EfficientNet",
-    "ResNet"
-])
-
-
-# TODO: COMPLETER ICI ?
+# Afficher la démo live avec Random Forest et SGDC
+demonstration.live_demo.render()
