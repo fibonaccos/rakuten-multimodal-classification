@@ -37,7 +37,7 @@ with random_forest_tab:
 with svm_tab:
     st.header("SVM")
 
-    # TODO: COMPLETER ICI ROMAIN
+    modelisation.svm.render()
 
 
 with efficientnet_tab:
