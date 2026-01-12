@@ -14,6 +14,18 @@ if str(PROJECT_ROOT) not in sys.path:
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 
 
+def download_nltk_resources():
+    """Télécharge les ressources NLTK nécessaires"""
+    try:
+        import nltk
+        try:
+            nltk.data.find('corpora/stopwords')
+        except LookupError:
+            nltk.download('stopwords', quiet=True)
+    except ImportError:
+        pass
+
+
 @st.cache_data
 def load_data():
     """Charge les données Y_train"""
@@ -24,14 +36,22 @@ def load_data():
     except Exception:
         pass
     return None
+
+
+@st.cache_data
+def load_full_data():
+    """Charge les données complètes X_train + Y_train"""
     try:
-        import nltk
-        try:
-            nltk.data.find('corpora/stopwords')
-        except LookupError:
-            nltk.download('stopwords', quiet=True)
-    except ImportError:
+        x_path = Path(r"C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten\data\X_train_update.csv")
+        y_path = Path(r"C:\Users\HP\DataScientest\PROJET\deep_learning_rakuten\data\Y_train_CVw08PX.csv")
+        
+        if x_path.exists() and y_path.exists():
+            X = pd.read_csv(x_path)
+            Y = pd.read_csv(y_path)
+            return pd.concat([X, Y['prdtypecode']], axis=1)
+    except Exception:
         pass
+    return None
 
 
 def get_all_stopwords():
@@ -95,52 +115,39 @@ def process_text_for_wordclouds(df):
 
 
 def generate_interactive_wordclouds():
-    """Génère les nuages de mots interactifs avec boutons"""
-    try:
-        from wordcloud import WordCloud
-    except ImportError:
-        st.warning("⚠️ Module wordcloud non disponible")
+    """Affiche les nuages de mots pré-générés avec sélection interactive"""
+    
+    # Chemin vers les images pré-générées
+    wordclouds_dir = Path(__file__).parent.parent.parent / 'assets' / 'wordclouds'
+    
+    if not wordclouds_dir.exists():
+        st.info("📁 Images des nuages de mots non disponibles")
         return
-    
-    download_nltk_resources()
-    
-    # Charger les données
-    df = load_full_data()
-    
-    if df is None:
-        st.info("📁 Données brutes non disponibles localement - nuages de mots désactivés")
-        return
-    
-    # Préparer les textes
-    with st.spinner("Traitement des textes..."):
-        text_by_class = process_text_for_wordclouds(df)
-    
-    available_classes = sorted(text_by_class.index.unique())
     
     # Mapping des catégories
     category_names = {
-        10: "Livres/Médias", 40: "Jeux vidéo/Consoles", 50: "Accessoires gaming",
-        60: "Consoles", 1140: "Figurines", 1160: "Cartes collectibles",
-        1180: "Figurines", 1280: "Jeux (général)", 1281: "Jeux PC",
-        1300: "Déco intérieure", 1301: "Déco extérieure", 1302: "Accessoires consoles",
-        1320: "Mobilier intérieur", 1560: "Mobilier extérieur", 1920: "Linge de maison",
-        1940: "Literie/Ameublement", 2060: "Déco murale", 2220: "Équipement animaux",
-        2280: "Magazines", 2403: "Livres (autre type)", 2462: "Jeux/Consoles retro",
+        10: "Livres", 40: "Jeux vidéo/consoles", 50: "Accessoires gaming",
+        60: "Consoles", 1140: "Figurines", 1160: "Cartes collection",
+        1180: "Modélisme", 1280: "Jeux enfants", 1281: "Jeux PC",
+        1300: "Accessoires bébé", 1301: "Puériculture", 1302: "Accessoires consoles",
+        1320: "Mobilier enfant", 1560: "Mobilier intérieur", 1920: "Linge maison",
+        1940: "Alimentation", 2060: "Décoration", 2220: "Animaux",
+        2280: "Magazines", 2403: "Livres format poche", 2462: "Jeux société",
         2522: "Papeterie", 2582: "Mobilier extérieur", 2583: "Piscines",
-        2585: "Bricolage", 2705: "Livres", 2905: "Jeux de société"
+        2585: "Bricolage", 2705: "Livres anciens", 2905: "Jeux rétro"
     }
     
     st.write("**Sélectionnez une catégorie pour visualiser son nuage de mots :**")
     
-    # Créer des colonnes pour les boutons (5 boutons par ligne)
-    cols_per_row = 5
-    rows = [available_classes[i:i+cols_per_row] for i in range(0, len(available_classes), cols_per_row)]
-    
     # Session state pour stocker la sélection
     if 'selected_wordcloud_class' not in st.session_state:
-        st.session_state.selected_wordcloud_class = available_classes[0]
+        st.session_state.selected_wordcloud_class = list(category_names.keys())[0]
     
-    # Afficher les boutons
+    # Créer des colonnes pour les boutons (7 boutons par ligne)
+    cols_per_row = 7
+    categories = sorted(category_names.keys())
+    rows = [categories[i:i+cols_per_row] for i in range(0, len(categories), cols_per_row)]
+    
     for row in rows:
         cols = st.columns(cols_per_row)
         for idx, cat_code in enumerate(row):
@@ -149,17 +156,18 @@ def generate_interactive_wordclouds():
                 if st.button(f"{cat_code}\n{cat_name}", key=f"wc_{cat_code}", use_container_width=True):
                     st.session_state.selected_wordcloud_class = cat_code
     
-    # Afficher le wordcloud pré-généré pour la catégorie sélectionnée
-    selected_class = st.session_state.selected_wordcloud_class
-    st.markdown(f"### Catégorie : **{selected_class}** - *{category_names.get(selected_class, 'N/A')}*")
-    
-    # Charger l'image pré-générée
-    wordcloud_path = ASSETS_DIR / "wordclouds" / f"wordcloud_{selected_class}.png"
-    
-    if wordcloud_path.exists():
-        st.image(str(wordcloud_path), use_container_width=True)
-    else:
-        st.warning(f"Nuage de mots non disponible pour la catégorie {selected_class}")
+    # Afficher le wordcloud sélectionné
+    if hasattr(st.session_state, 'selected_wordcloud_class'):
+        selected_class = st.session_state.selected_wordcloud_class
+        st.markdown(f"### Catégorie : **{selected_class}** - *{category_names.get(selected_class, 'N/A')}*")
+        
+        # Charger l'image pré-générée
+        wordcloud_path = wordclouds_dir / f"wordcloud_{selected_class}.png"
+        
+        if wordcloud_path.exists():
+            st.image(str(wordcloud_path), use_container_width=True)
+        else:
+            st.warning(f"Nuage de mots non disponible pour la catégorie {selected_class}")
 
 
 def render():
