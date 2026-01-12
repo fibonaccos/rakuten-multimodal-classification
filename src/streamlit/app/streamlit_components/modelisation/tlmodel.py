@@ -134,7 +134,6 @@ def write_modelisation_training() -> None:
 
 
 def write_modelisation_interpretability() -> None:
-    st.markdown("### Interprétabilité")
     st.markdown(
         f"""
         On trouvera ci-dessous quelques exemples illustrant le comportement du modèle \
